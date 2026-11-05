@@ -4,6 +4,7 @@ import { backend } from "../storage/backend";
 import { notesPathFor } from "../storage/paths";
 import { useNotebook, visibleTabs } from "../store/notebook";
 import { CloseIcon } from "./Icons";
+import { AiSection } from "./AiSettings";
 
 type Section = "clients" | "ai" | "export" | "general";
 const SECTIONS: { id: Section; label: string }[] = [
@@ -52,7 +53,7 @@ export function SettingsPanel() {
           </nav>
           <div className="settings-section">
             {section === "clients" && <ClientsSection />}
-            {section === "ai" && <ComingLater title="AI" milestone="milestone 4" />}
+            {section === "ai" && <AiSection />}
             {section === "export" && <ComingLater title="Export" milestone="milestone 5" />}
             {section === "general" && <GeneralSection />}
           </div>
@@ -157,6 +158,21 @@ function ClientsSection() {
               </span>
             </div>
             <div className="row-actions">
+              <label className="exclude-ai" title="Never send this tab's notes to the AI provider">
+                <input
+                  type="checkbox"
+                  checked={t.excludeFromAi}
+                  onChange={(e) =>
+                    void updateConfig((c) => ({
+                      ...c,
+                      tabs: c.tabs.map((x) =>
+                        x.id === t.id ? { ...x, excludeFromAi: e.target.checked } : x,
+                      ),
+                    }))
+                  }
+                />
+                Exclude from AI
+              </label>
               <button
                 className="small-button"
                 disabled={missing}

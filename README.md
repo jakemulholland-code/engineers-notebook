@@ -11,7 +11,7 @@ Built with Tauri 2, React 18, TypeScript and Konva. See [SPEC.md](SPEC.md) for t
 | M1 Shell and storage | Done |
 | M2 Canvas tools | Done |
 | M3 Dates and Reminders | Done |
-| M4 AI | Not started |
+| M4 AI | Done (tested against a local mock of each API; check each real provider with your own key) |
 | M5 Export | Not started |
 | M6 Release | Not started |
 
@@ -66,6 +66,30 @@ npm run e2e:m2
 ```bash
 npm run e2e:m3
 ```
+
+`e2e:m4` drives the AI features against `scripts/mock-ai.mjs`, a local server that speaks the OpenRouter, OpenAI, Anthropic and Gemini wire formats. Start the app with these extra variables first, so dev builds point at the mock and use a separate Credential Manager entry (they have no effect in release builds):
+
+```powershell
+$env:ENGINEERS_NOTEBOOK_AI_HOST = "http://127.0.0.1:9455"
+$env:ENGINEERS_NOTEBOOK_KEYRING_SERVICE = "engineers-notebook-e2e"
+npm run tauri dev *> test-fixtures\_scratch\app.log
+```
+
+```bash
+npm run e2e:m4
+```
+
+## AI providers
+
+Choose a provider, paste a key and pick a model in Settings › AI. Keys go to Windows Credential Manager (entry `engineers-notebook`), never to a file. Requests are made from the Rust side, so keys never reach the web view.
+
+| Provider | Notes |
+| --- | --- |
+| OpenRouter (default) | Models list shows which accept images. |
+| OpenAI | Sends `max_completion_tokens`; if a model refuses `temperature`, the request is retried once without it. |
+| Anthropic | API version `2026-10-21`, which does not accept `temperature`, so it is not sent. |
+| Google Gemini | `streamGenerateContent` with SSE and JSON output. |
+| Custom | Any OpenAI-compatible server (LM Studio, Ollama). Key optional. |
 
 `ENGINEERS_NOTEBOOK_APP_DIR` points the app at a different config folder than `%APPDATA%\engineers-notebook`. Use it for any dev run so your real setup is left alone.
 

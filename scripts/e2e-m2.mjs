@@ -428,18 +428,16 @@ const stats = await page.evaluate(async () => {
   };
   requestAnimationFrame(loop);
   const wheel = (dy, ctrl) =>
-    document
-      .querySelector(".paper-viewport canvas")
-      .dispatchEvent(
-        new WheelEvent("wheel", {
-          deltaY: dy,
-          ctrlKey: ctrl,
-          clientX: vp.x + vp.width / 2,
-          clientY: vp.y + vp.height / 2,
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
+    document.querySelector(".paper-viewport canvas").dispatchEvent(
+      new WheelEvent("wheel", {
+        deltaY: dy,
+        ctrlKey: ctrl,
+        clientX: vp.x + vp.width / 2,
+        clientY: vp.y + vp.height / 2,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   const wait = () => new Promise((r) => requestAnimationFrame(() => r()));
   for (let i = 0; i < 60; i++) {
     wheel(i < 30 ? 60 : -60, true); // zoom out then in

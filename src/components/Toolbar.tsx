@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { INK_COLOURS, STROKE_WIDTHS } from "../model/config";
 import { restyle } from "../canvas/elements";
+import { useCatchUp } from "../ai/catchUp";
 import { currentPageOf, historyFor, useNotebook } from "../store/notebook";
 import { useTools, type ToolId } from "../store/tools";
 import {
@@ -49,6 +50,7 @@ export function Toolbar() {
   const updateConfig = useNotebook((s) => s.updateConfig);
   const openSettings = useNotebook((s) => s.setSettingsOpen);
 
+  const catchUpOpen = useCatchUp((s) => s.open);
   const undo = useNotebook((s) => s.undo);
   const redo = useNotebook((s) => s.redo);
   const editElements = useNotebook((s) => s.editElements);
@@ -147,7 +149,11 @@ export function Toolbar() {
         >
           <RedoIcon />
         </button>
-        <button className="pill primary" disabled title="AI catch-up arrives in milestone 4">
+        <button
+          className="pill primary"
+          aria-pressed={catchUpOpen}
+          onClick={() => useCatchUp.getState().setOpen(!catchUpOpen)}
+        >
           <CatchUpIcon size={18} />
           Catch me up
         </button>

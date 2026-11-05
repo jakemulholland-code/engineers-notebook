@@ -32,9 +32,10 @@ export function RemindersView() {
         tabId: tabId || undefined,
         kind: kind === "all" ? undefined : kind,
         showDone,
+        staleDays: config.ai.staleDays,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [index, todayYmd, tabId, kind, showDone],
+    [index, todayYmd, tabId, kind, showDone, config.ai.staleDays],
   );
 
   return (

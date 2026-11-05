@@ -22,6 +22,29 @@ export const TabConfigSchema = z.object({
   excludeFromAi: z.boolean().default(false),
 });
 
+export const AI_PROVIDERS = ["openrouter", "openai", "anthropic", "gemini", "custom"] as const;
+export type AiProviderId = (typeof AI_PROVIDERS)[number];
+
+export const PROVIDER_LABEL: Record<AiProviderId, string> = {
+  openrouter: "OpenRouter",
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  gemini: "Google Gemini",
+  custom: "Custom (OpenAI-compatible)",
+};
+
+/** AI choices. API keys are never stored here; they live in Windows Credential Manager. */
+const AiSettingsSchema = z.object({
+  provider: z.enum(AI_PROVIDERS).default("openrouter"),
+  /** Chosen model id per provider. */
+  models: z.record(z.string(), z.string()).default({}),
+  customBaseUrl: z.string().default(""),
+  lookAheadDays: z.number().default(14),
+  staleDays: z.number().default(21),
+  includeSnapshots: z.boolean().default(false),
+  temperature: z.number().min(0).max(2).default(0.3),
+});
+
 export const AppConfigSchema = z.object({
   schemaVersion: z.literal(1).default(1),
   tabs: z.array(TabConfigSchema).default([]),
@@ -43,7 +66,10 @@ export const AppConfigSchema = z.object({
       startWithWindows: false,
       checkForUpdates: true,
     }),
+  ai: AiSettingsSchema.default(AiSettingsSchema.parse({})),
 });
+
+export type AiSettings = z.infer<typeof AiSettingsSchema>;
 
 export type TabConfig = z.infer<typeof TabConfigSchema>;
 export type AppConfig = z.infer<typeof AppConfigSchema>;

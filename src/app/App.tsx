@@ -11,6 +11,7 @@ import { currentPageOf, useNotebook } from "../store/notebook";
 import { TOOL_KEYS, useTools } from "../store/tools";
 import { usePersistReminderCache } from "../reminders/useReminders";
 import { RemindersView } from "./RemindersView";
+import { CatchUpPanel } from "../components/CatchUpPanel";
 
 const RING_COUNT = 14;
 
@@ -76,6 +77,7 @@ export function App() {
       <Toolbar />
       <main className="main">
         {ready ? <MainView /> : <div className="placeholder-view">Opening notebook</div>}
+        <CatchUpPanel />
       </main>
       <StatusBar />
       <SettingsPanel />

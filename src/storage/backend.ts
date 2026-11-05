@@ -32,6 +32,10 @@ export interface Backend {
   /** Saves PNG bytes (base64) into `<notes>/assets`, de-duplicated; returns `assets/<sha256>.png`. */
   saveAsset(notesPath: string, pngBase64: string): Promise<string>;
   readAsset(notesPath: string, rel: string): Promise<ArrayBuffer>;
+  /** API keys: saved to the OS credential store. Only the last four characters ever come back. */
+  keyStatus(provider: string): Promise<string | null>;
+  saveKey(provider: string, key: string): Promise<string>;
+  removeKey(provider: string): Promise<void>;
   chooseFolder(title: string): Promise<string | null>;
 }
 
@@ -52,6 +56,9 @@ const tauriBackend: Backend = {
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
   saveAsset: (notesPath, dataBase64) => invoke<string>("save_asset", { notesPath, dataBase64 }),
   readAsset: (notesPath, rel) => invoke<ArrayBuffer>("read_asset", { notesPath, rel }),
+  keyStatus: (provider) => invoke<string | null>("key_status", { provider }),
+  saveKey: (provider, key) => invoke<string>("save_key", { provider, key }),
+  removeKey: (provider) => invoke("remove_key", { provider }),
   chooseFolder: async (title) => {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ directory: true, multiple: false, title });
@@ -63,6 +70,7 @@ function createMemoryBackend(): Backend {
   const files = new Map<string, string>();
   const assets = new Map<string, ArrayBuffer>();
   const appFiles = new Map<string, string>();
+  const keys = new Map<string, string>();
   const dirs = new Set<string>(["C:/Demo/Grade A Technology"]);
   let config: string | null = null;
   return {
@@ -114,6 +122,15 @@ function createMemoryBackend(): Backend {
       const rel = `assets/${hex}.png`;
       assets.set(`${notesPath}/${rel}`, bytes.buffer);
       return rel;
+    },
+    // Browser preview only: keeps the last four characters, never the key.
+    keyStatus: async (p) => keys.get(p) ?? null,
+    saveKey: async (p, k) => {
+      keys.set(p, k.trim().slice(-4));
+      return k.trim().slice(-4);
+    },
+    removeKey: async (p) => {
+      keys.delete(p);
     },
     readAsset: async (notesPath, rel) => {
       const v = assets.get(`${notesPath}/${rel}`);
