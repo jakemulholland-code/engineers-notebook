@@ -1,0 +1,40 @@
+import { useNotebook, visibleTabs } from "../store/notebook";
+import { BellIcon, PlusIcon } from "./Icons";
+
+export function Tabs() {
+  const config = useNotebook((s) => s.config);
+  const view = useNotebook((s) => s.view);
+  const openTab = useNotebook((s) => s.openTab);
+  const openReminders = useNotebook((s) => s.openReminders);
+  const openSettings = useNotebook((s) => s.setSettingsOpen);
+  const tabs = visibleTabs(config);
+
+  return (
+    <nav className="tabs" aria-label="Notebook tabs">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          className="tab"
+          aria-current={view.kind === "tab" && view.tabId === t.id ? "page" : undefined}
+          onClick={() => openTab(t.id)}
+          title={t.name}
+        >
+          <span className="marker" style={{ background: t.colour }} aria-hidden="true" />
+          <span className="name">{t.name}</span>
+        </button>
+      ))}
+      <button
+        className="tab reminders"
+        aria-current={view.kind === "reminders" ? "page" : undefined}
+        onClick={openReminders}
+      >
+        <BellIcon size={16} />
+        <span className="name">Reminders</span>
+      </button>
+      <button className="tab new" onClick={() => openSettings(true)}>
+        <PlusIcon size={14} />
+        New tab
+      </button>
+    </nav>
+  );
+}

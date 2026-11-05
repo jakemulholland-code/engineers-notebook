@@ -1,0 +1,72 @@
+import { useEffect, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import { currentPageOf, useNotebook, type SaveState } from "../store/notebook";
+import { useTools } from "../store/tools";
+import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "./Icons";
+
+function saveLabel(s: SaveState, now: number): string {
+  switch (s.kind) {
+    case "saving":
+      return "Saving";
+    case "unsaved":
+      return "Unsaved changes";
+    case "read-only":
+      return "Read-only";
+    case "error":
+      return "Not saved";
+    case "saved": {
+      if (!s.at) return "Saved";
+      const secs = Math.round((now - s.at.getTime()) / 1000);
+      if (secs < 10) return "Saved just now";
+      if (secs < 60) return `Saved ${secs} seconds ago`;
+      const mins = Math.round(secs / 60);
+      return mins === 1 ? "Saved 1 minute ago" : `Saved ${mins} minutes ago`;
+    }
+  }
+}
+
+export function StatusBar() {
+  const cur = useNotebook(useShallow(currentPageOf));
+  const save = useNotebook((s) => s.save);
+  const goToPage = useNotebook((s) => s.goToPage);
+  const newPage = useNotebook((s) => s.newPage);
+  const general = useNotebook((s) => s.config.general);
+  const zoom = useTools((s) => s.zoom);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 10_000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <footer className="statusbar">
+      {cur && (
+        <div className="pager">
+          <button className="icon-button small" aria-label="Previous page" disabled={cur.index === 0} onClick={() => goToPage(-1)}>
+            <ChevronLeftIcon size={16} />
+          </button>
+          <span>
+            Page {cur.index + 1} of {cur.count}
+          </span>
+          <button
+            className="icon-button small"
+            aria-label="Next page"
+            disabled={cur.index >= cur.count - 1}
+            onClick={() => goToPage(1)}
+          >
+            <ChevronRightIcon size={16} />
+          </button>
+          <button className="icon-button small" aria-label="New page" title="New page" onClick={() => void newPage()}>
+            <PlusIcon size={16} />
+          </button>
+        </div>
+      )}
+      <span>{general.lockToGrid ? `Snapping to ${general.gridSize} px grid` : "Grid snapping off"}</span>
+      <span className={`push ${save.kind === "error" ? "error" : ""}`} title={save.kind === "error" ? save.message : undefined}>
+        {cur ? saveLabel(save, now) : ""}
+      </span>
+      <span>{Math.round(zoom * 100)}%</span>
+    </footer>
+  );
+}

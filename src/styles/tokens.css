@@ -1,0 +1,51 @@
+/*
+ * Design tokens. Every colour, radius and size used by the app lives here.
+ * Source: SPEC.md "Visual design" and the approved mockups.
+ */
+:root {
+  /* Colours */
+  --desk: #0c1332;
+  --desk-deep: #070b1f; /* ring holes */
+  --desk-raised: #121b42; /* inputs on the desk */
+  --paper: #163764;
+  --paper-margin: #112b50; /* viewport area outside the sheet when zoomed out */
+  --grid-minor: rgba(255, 255, 255, 0.09);
+  --grid-major: rgba(255, 255, 255, 0.22);
+  --grid-minor-step: 20px;
+  --grid-major-step: 100px;
+  --ink-white: #f4f7ff;
+  --mint: #01c6a3;
+  --mint-soft: #7fe6d3;
+  --mint-wash: rgba(1, 198, 163, 0.12);
+  --gold: #e8a828;
+  --gold-soft: #ffd27a;
+  --pink: #ff5c86;
+  --pink-soft: #ff8fab;
+  --pale-blue: #8fb8ff;
+  --pale-blue-soft: #c9dcff;
+  --text: #e9edfd;
+  --text-muted: #b9c6e6;
+  --tab-idle-text: #c7d0ea;
+
+  /* Chrome overlays on the desk */
+  --line: rgba(233, 237, 253, 0.1);
+  --line-strong: rgba(233, 237, 253, 0.22);
+  --chip: rgba(233, 237, 253, 0.06);
+  --chip-hover: rgba(233, 237, 253, 0.1);
+  --chip-active: rgba(233, 237, 253, 0.14);
+  --tab-idle: rgba(233, 237, 253, 0.07);
+  --shadow-popover: 0 18px 40px rgba(4, 8, 24, 0.55);
+
+  /* Type */
+  --font-display: "Bricolage Grotesque", "Satoshi", sans-serif;
+  --font-body: "Satoshi", "Helvetica Neue", Arial, sans-serif;
+
+  /* Shape and size */
+  --radius-group: 12px;
+  --radius-button: 9px;
+  --radius-pill: 30px;
+  --radius-popover: 18px;
+  --hit: 44px;
+  --icon: 20px;
+  --focus-ring: 2px solid var(--mint);
+}

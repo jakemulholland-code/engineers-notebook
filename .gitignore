@@ -1,0 +1,12 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/schemas/
+*.log
+.env
+.env.*
+config.local.json
+.DS_Store
+Thumbs.db
+# Local scratch copies of test fixtures written during dev runs
+test-fixtures/_scratch/
