@@ -70,7 +70,10 @@ export async function importImage(
   ctx.drawImage(bitmap, 0, 0);
   bitmap.close();
   const png = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Could not convert the image"))), "image/png"),
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error("Could not convert the image"))),
+      "image/png",
+    ),
   );
   const rel = await backend.saveAsset(notesPath, toBase64(await png.arrayBuffer()));
   const k = key(notesPath, rel);

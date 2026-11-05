@@ -29,7 +29,12 @@ export async function loadTab(folder: string): Promise<TabLoadResult> {
       const text = await backend.readTextFile(pagePath(notesPath, fileName));
       const parsed = parsePage(text);
       if (parsed.ok) {
-        pages.push({ fileName, page: parsed.page, readOnly: parsed.readOnly, warning: parsed.warning });
+        pages.push({
+          fileName,
+          page: parsed.page,
+          readOnly: parsed.readOnly,
+          warning: parsed.warning,
+        });
       } else {
         errors.push(`${fileName}: ${parsed.error}`);
       }

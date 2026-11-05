@@ -9,11 +9,16 @@ import { CloseIcon } from "../components/Icons";
 import { backend } from "../storage/backend";
 import { currentPageOf, useNotebook } from "../store/notebook";
 import { TOOL_KEYS, useTools } from "../store/tools";
+import { usePersistReminderCache } from "../reminders/useReminders";
+import { RemindersView } from "./RemindersView";
 
 const RING_COUNT = 14;
 
 function isTyping(t: EventTarget | null): boolean {
-  return t instanceof HTMLElement && (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
+  return (
+    t instanceof HTMLElement &&
+    (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName))
+  );
 }
 
 export function App() {
@@ -25,6 +30,8 @@ export function App() {
   useEffect(() => {
     void init();
   }, [init]);
+
+  usePersistReminderCache();
 
   // Save anything pending before the window closes.
   useEffect(() => {
@@ -51,7 +58,10 @@ export function App() {
       if (isTyping(e.target) || e.ctrlKey || e.altKey || e.metaKey || s.settingsOpen) return;
       const key = e.key.toLowerCase();
       if (key === "g") {
-        void s.updateConfig((c) => ({ ...c, general: { ...c.general, lockToGrid: !c.general.lockToGrid } }));
+        void s.updateConfig((c) => ({
+          ...c,
+          general: { ...c.general, lockToGrid: !c.general.lockToGrid },
+        }));
         return;
       }
       const tool = TOOL_KEYS[key];
@@ -64,7 +74,9 @@ export function App() {
   return (
     <div className="app">
       <Toolbar />
-      <main className="main">{ready ? <MainView /> : <div className="placeholder-view">Opening notebook</div>}</main>
+      <main className="main">
+        {ready ? <MainView /> : <div className="placeholder-view">Opening notebook</div>}
+      </main>
       <StatusBar />
       <SettingsPanel />
       {notice && (
@@ -94,7 +106,10 @@ function MainView() {
       <div className="empty-state">
         <div>
           <h2>Add your first client</h2>
-          <p>Each tab is tied to a folder on disk. Choose a client folder in Settings and the app will keep its notes there.</p>
+          <p>
+            Each tab is tied to a folder on disk. Choose a client folder in Settings and the app
+            will keep its notes there.
+          </p>
           <div className="actions">
             <button className="pill primary" onClick={() => openSettings(true)}>
               Open settings
@@ -104,7 +119,7 @@ function MainView() {
       </div>
     );
   } else if (view.kind === "reminders") {
-    content = <div className="placeholder-view">Reminders arrive in milestone 3.</div>;
+    content = <RemindersView />;
   } else {
     const tabState = tabs[view.tabId];
     const tab = config.tabs.find((t) => t.id === view.tabId);
@@ -116,14 +131,17 @@ function MainView() {
           <div>
             <h2>Folder not found</h2>
             <p>
-              {tabState.notesPath} is not available. The drive may be unplugged or the folder moved. The app will not create a new
-              one on its own.
+              {tabState.notesPath} is not available. The drive may be unplugged or the folder moved.
+              The app will not create a new one on its own.
             </p>
             <div className="actions">
               <button className="pill primary" onClick={() => openSettings(true)}>
                 Choose it again
               </button>
-              <button className="pill ghost" onClick={() => void useNotebook.getState().reloadTab(view.tabId)}>
+              <button
+                className="pill ghost"
+                onClick={() => void useNotebook.getState().reloadTab(view.tabId)}
+              >
                 Try again
               </button>
             </div>

@@ -3,6 +3,9 @@ import { useShallow } from "zustand/react/shallow";
 import { currentPageOf, useNotebook, type SaveState } from "../store/notebook";
 import { useTools } from "../store/tools";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "./Icons";
+import { fromYmd } from "../reminders/dates";
+import { overdueCount } from "../reminders/index";
+import { useReminderIndex, useToday } from "../reminders/useReminders";
 
 function saveLabel(s: SaveState, now: number): string {
   switch (s.kind) {
@@ -25,6 +28,18 @@ function saveLabel(s: SaveState, now: number): string {
   }
 }
 
+function RemindersCount() {
+  const { index } = useReminderIndex();
+  const today = fromYmd(useToday());
+  const open = index.items.filter((i) => !i.tag.done).length;
+  const overdue = overdueCount(index, today);
+  return (
+    <span>
+      {open === 1 ? "1 item" : `${open} items`}, {overdue} overdue
+    </span>
+  );
+}
+
 export function StatusBar() {
   const cur = useNotebook(useShallow(currentPageOf));
   const save = useNotebook((s) => s.save);
@@ -32,6 +47,7 @@ export function StatusBar() {
   const newPage = useNotebook((s) => s.newPage);
   const general = useNotebook((s) => s.config.general);
   const zoom = useTools((s) => s.zoom);
+  const view = useNotebook((s) => s.view);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -43,7 +59,12 @@ export function StatusBar() {
     <footer className="statusbar">
       {cur && (
         <div className="pager">
-          <button className="icon-button small" aria-label="Previous page" disabled={cur.index === 0} onClick={() => goToPage(-1)}>
+          <button
+            className="icon-button small"
+            aria-label="Previous page"
+            disabled={cur.index === 0}
+            onClick={() => goToPage(-1)}
+          >
             <ChevronLeftIcon size={16} />
           </button>
           <span>
@@ -57,13 +78,27 @@ export function StatusBar() {
           >
             <ChevronRightIcon size={16} />
           </button>
-          <button className="icon-button small" aria-label="New page" title="New page" onClick={() => void newPage()}>
+          <button
+            className="icon-button small"
+            aria-label="New page"
+            title="New page"
+            onClick={() => void newPage()}
+          >
             <PlusIcon size={16} />
           </button>
         </div>
       )}
-      <span>{general.lockToGrid ? `Snapping to ${general.gridSize} px grid` : "Grid snapping off"}</span>
-      <span className={`push ${save.kind === "error" ? "error" : ""}`} title={save.kind === "error" ? save.message : undefined}>
+      {view.kind === "reminders" ? (
+        <RemindersCount />
+      ) : (
+        <span>
+          {general.lockToGrid ? `Snapping to ${general.gridSize} px grid` : "Grid snapping off"}
+        </span>
+      )}
+      <span
+        className={`push ${save.kind === "error" ? "error" : ""}`}
+        title={save.kind === "error" ? save.message : undefined}
+      >
         {cur ? saveLabel(save, now) : ""}
       </span>
       <span>{Math.round(zoom * 100)}%</span>

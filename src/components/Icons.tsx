@@ -139,7 +139,15 @@ export const FolderIcon = (p: IconProps) => (
 
 export function NotebookMark() {
   return (
-    <svg width="26" height="26" viewBox="0 0 26 26" fill="none" stroke="var(--mint)" strokeWidth="1.8" aria-hidden="true">
+    <svg
+      width="26"
+      height="26"
+      viewBox="0 0 26 26"
+      fill="none"
+      stroke="var(--mint)"
+      strokeWidth="1.8"
+      aria-hidden="true"
+    >
       <rect x="5" y="3" width="17" height="20" rx="2" />
       <path d="M3 7h4M3 11h4M3 15h4M3 19h4" />
       <path d="M11 9h7M11 13h7M11 17h4" />

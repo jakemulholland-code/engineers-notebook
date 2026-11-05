@@ -59,12 +59,22 @@ for (const p of ["pages", "assets", "notebook.json"]) {
 // Register the tab in app config and reload so the app picks it up.
 const cfgPath = path.join(scratch, "appdata", "config.json");
 const cfg = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, "utf8")) : {};
-cfg.tabs = [{ id: "tab-a", name: "Client A", colour: "#01C6A3", folder: client, order: 0, archived: false, excludeFromAi: false }];
+cfg.tabs = [
+  {
+    id: "tab-a",
+    name: "Client A",
+    colour: "#01C6A3",
+    folder: client,
+    order: 0,
+    archived: false,
+    excludeFromAi: false,
+  },
+];
 fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
 fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
 await page.reload();
 await page.waitForSelector("text=Client A");
-check("tab shows in the tab list", await page.isVisible('.tabs >> text=Client A'));
+check("tab shows in the tab list", await page.isVisible(".tabs >> text=Client A"));
 
 // --- New page is written to disk.
 await page.click("text=New page");
@@ -77,23 +87,39 @@ check("new page file written", files.length === 1, files.join(", "));
 await page.fill("#page-title-input", "E2E faceted audit");
 await sleep(400);
 files = fs.readdirSync(pages).filter((f) => f.endsWith(".page.json"));
-check("no save before the 800 ms debounce", files.some((f) => f.endsWith("-untitled-page.page.json")), files.join(", "));
+check(
+  "no save before the 800 ms debounce",
+  files.some((f) => f.endsWith("-untitled-page.page.json")),
+  files.join(", "),
+);
 await sleep(1200);
 files = fs.readdirSync(pages).filter((f) => f.endsWith(".page.json"));
 const renamed = files.find((f) => f.endsWith("-e2e-faceted-audit.page.json"));
 check("file renamed to match title", !!renamed, files.join(", "));
 const saved = renamed ? JSON.parse(fs.readFileSync(path.join(pages, renamed), "utf8")) : null;
 check("saved JSON has new title", saved?.title === "E2E faceted audit");
-check("a .bak of the previous version exists", !!renamed && fs.existsSync(path.join(pages, `${renamed}.bak`)));
+check(
+  "a .bak of the previous version exists",
+  !!renamed && fs.existsSync(path.join(pages, `${renamed}.bak`)),
+);
 check("no temp files left", !fs.readdirSync(pages).some((f) => f.endsWith(".tmp")));
 
 // --- Reload from disk.
 await page.reload();
 await page.waitForSelector("#page-title-input");
-check("title survives reload", (await page.inputValue("#page-title-input")) === "E2E faceted audit");
+check(
+  "title survives reload",
+  (await page.inputValue("#page-title-input")) === "E2E faceted audit",
+);
 
 // --- Future schema version opens read-only and is not overwritten.
-const future = { ...saved, id: "future-page", title: "From the future", schemaVersion: 99, createdAt: "2030-01-01T10:00:00.000Z" };
+const future = {
+  ...saved,
+  id: "future-page",
+  title: "From the future",
+  schemaVersion: 99,
+  createdAt: "2030-01-01T10:00:00.000Z",
+};
 const futureName = "2030-01-01-from-the-future.page.json";
 fs.writeFileSync(path.join(pages, futureName), JSON.stringify(future));
 await page.reload();
@@ -105,7 +131,10 @@ const ro = await page.getAttribute("#page-title-input", "readonly");
 check("future-version page opens read-only", ro !== null);
 const before = fs.readFileSync(path.join(pages, futureName), "utf8");
 await sleep(1200);
-check("future-version page untouched on disk", fs.readFileSync(path.join(pages, futureName), "utf8") === before);
+check(
+  "future-version page untouched on disk",
+  fs.readFileSync(path.join(pages, futureName), "utf8") === before,
+);
 
 await page.screenshot({ path: path.join(scratch, "m1-screenshot.png") });
 await browser.close();

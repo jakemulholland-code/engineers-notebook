@@ -25,9 +25,7 @@ export const TabConfigSchema = z.object({
 export const AppConfigSchema = z.object({
   schemaVersion: z.literal(1).default(1),
   tabs: z.array(TabConfigSchema).default([]),
-  lastOpened: z
-    .object({ tabId: z.string().optional(), pageId: z.string().optional() })
-    .default({}),
+  lastOpened: z.object({ tabId: z.string().optional(), pageId: z.string().optional() }).default({}),
   general: z
     .object({
       gridSize: z.number().default(20),

@@ -16,7 +16,10 @@ await sleep(300);
 const vp = await page.locator(".paper-viewport").boundingBox();
 const at = (x, y) => ({ x: vp.x + x, y: vp.y + y }); // page coords at 100% zoom, no pan
 
-const blur = () => page.evaluate(() => document.activeElement instanceof HTMLElement && document.activeElement.blur());
+const blur = () =>
+  page.evaluate(
+    () => document.activeElement instanceof HTMLElement && document.activeElement.blur(),
+  );
 const key = async (k) => {
   await blur();
   await page.keyboard.press(k);
@@ -28,7 +31,8 @@ async function drag(from, to, { steps = 10, hold = [] } = {}) {
   const b = at(to[0], to[1]);
   await page.mouse.move(a.x, a.y);
   await page.mouse.down();
-  for (let i = 1; i <= steps; i++) await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
+  for (let i = 1; i <= steps; i++)
+    await page.mouse.move(a.x + ((b.x - a.x) * i) / steps, a.y + ((b.y - a.y) * i) / steps);
   await page.mouse.up();
   for (const h of hold) await page.keyboard.up(h);
   await sleep(150);
@@ -39,7 +43,10 @@ async function click(x, y, opts) {
   await sleep(150);
 }
 function readPage() {
-  const f = fs.readdirSync(pages).filter((n) => n.endsWith(".page.json")).sort()[0];
+  const f = fs
+    .readdirSync(pages)
+    .filter((n) => n.endsWith(".page.json"))
+    .sort()[0];
   return JSON.parse(fs.readFileSync(path.join(pages, f), "utf8"));
 }
 async function saved() {
@@ -57,9 +64,20 @@ await drag([200, 400], [420, 402]);
 let p = await saved();
 const pen = p.elements.find((e) => e.type === "stroke" && e.tool === "pen");
 const brush = p.elements.find((e) => e.type === "stroke" && e.tool === "brush");
-check("pen draws a stroke", pen && pen.points.length >= 9 && pen.points.length % 3 === 0, pen?.points.length);
-check("pen stroke not snapped point by point", pen && pen.x === 200 && pen.points.some((v, i) => i % 3 !== 2 && !onGrid(v)));
-check("brush is wide and 40% opacity", brush && brush.opacity === 0.4 && brush.width > pen.width, `${brush?.width}`);
+check(
+  "pen draws a stroke",
+  pen && pen.points.length >= 9 && pen.points.length % 3 === 0,
+  pen?.points.length,
+);
+check(
+  "pen stroke not snapped point by point",
+  pen && pen.x === 200 && pen.points.some((v, i) => i % 3 !== 2 && !onGrid(v)),
+);
+check(
+  "brush is wide and 40% opacity",
+  brush && brush.opacity === 0.4 && brush.width > pen.width,
+  `${brush?.width}`,
+);
 
 await key("l");
 await drag([203, 507], [397, 513]);
@@ -69,8 +87,16 @@ await key("a");
 await drag([443, 251], [517, 249]);
 p = await saved();
 const lines = ofType(p, "line");
-check("line start and end snap to grid", lines[0] && onGrid(lines[0].x, lines[0].y, lines[0].points[2], lines[0].points[3]), JSON.stringify(lines[0]?.points));
-check("Shift locks line to 0/45/90", lines[1] && lines[1].points[3] === 0, JSON.stringify(lines[1]?.points));
+check(
+  "line start and end snap to grid",
+  lines[0] && onGrid(lines[0].x, lines[0].y, lines[0].points[2], lines[0].points[3]),
+  JSON.stringify(lines[0]?.points),
+);
+check(
+  "Shift locks line to 0/45/90",
+  lines[1] && lines[1].points[3] === 0,
+  JSON.stringify(lines[1]?.points),
+);
 check("Alt ignores the grid", lines[2] && lines[2].x === 203, lines[2]?.x);
 check("arrow drawn", ofType(p, "arrow").length === 1);
 
@@ -83,7 +109,11 @@ await key("o");
 await drag([1203, 203], [1290, 250], { hold: ["Shift"] });
 p = await saved();
 const rects = ofType(p, "rect");
-check("box snaps to grid", rects[0] && rects[0].x === 600 && rects[0].y === 200 && rects[0].w === 200 && rects[0].h === 100, JSON.stringify(rects[0] && [rects[0].x, rects[0].y, rects[0].w, rects[0].h]));
+check(
+  "box snaps to grid",
+  rects[0] && rects[0].x === 600 && rects[0].y === 200 && rects[0].w === 200 && rects[0].h === 100,
+  JSON.stringify(rects[0] && [rects[0].x, rects[0].y, rects[0].w, rects[0].h]),
+);
 check("dashed box from flyout", rects[1]?.dashed === true && rects[0]?.dashed === false);
 const ell = ofType(p, "ellipse")[0];
 check("Shift draws a circle", ell && ell.w === ell.h, ell && `${ell.w}x${ell.h}`);
@@ -116,7 +146,11 @@ check(
 );
 check("heading created", texts[1]?.text === "Big heading" && texts[1].heading === true);
 const list = ofType(p, "checklist")[0];
-check("checklist with two items", list?.items.length === 2 && list.items[1].text === "Second item", JSON.stringify(list?.items.map((i) => i.text)));
+check(
+  "checklist with two items",
+  list?.items.length === 2 && list.items[1].text === "Second item",
+  JSON.stringify(list?.items.map((i) => i.text)),
+);
 
 // tick the first item (select tool)
 await key("v");
@@ -146,7 +180,11 @@ const right = [box.x + box.w + 6, box.y + box.h / 2];
 await drag(right, [right[0] + 47, right[1]]);
 p = await saved();
 box = ofType(p, "rect")[0];
-check("resize snaps width to grid", box && box.w === 240 && box.h === 100, box && `${box.w}x${box.h}`);
+check(
+  "resize snaps width to grid",
+  box && box.w === 240 && box.h === 100,
+  box && `${box.w}x${box.h}`,
+);
 
 // rotate with the rotation handle (50 px above the top edge, plus padding)
 const rot = [box.x + box.w / 2, box.y - 6 - 50];
@@ -170,7 +208,11 @@ await key("ArrowRight");
 await key("Shift+ArrowDown");
 p = await saved();
 box = ofType(p, "rect")[0];
-check("arrow nudges a grid square, Shift nudges 1 px", box.x === before.x + 20 && box.y === before.y + 1, `${box.x - before.x},${box.y - before.y}`);
+check(
+  "arrow nudges a grid square, Shift nudges 1 px",
+  box.x === before.x + 20 && box.y === before.y + 1,
+  `${box.x - before.x},${box.y - before.y}`,
+);
 
 const count = (await saved()).elements.length;
 await key("Control+d");
@@ -200,7 +242,10 @@ await key("Control+z");
 await key("e");
 await drag([300, 260], [300, 420], { steps: 20 }); // across the pen stroke
 p = await saved();
-check("eraser removes whole elements it touches", !p.elements.some((e) => e.type === "stroke" && e.tool === "pen"));
+check(
+  "eraser removes whole elements it touches",
+  !p.elements.some((e) => e.type === "stroke" && e.tool === "pen"),
+);
 
 // ---------- paste and drop ----------
 await key("v");
@@ -214,7 +259,11 @@ await page.evaluate(() => {
 });
 p = await saved();
 const pasted = ofType(p, "text").find((t) => t.text === "Pasted line");
-check("pasting text makes a text box at the cursor", pasted && pasted.x === 1200 && pasted.y === 700, pasted && `${pasted.x},${pasted.y}`);
+check(
+  "pasting text makes a text box at the cursor",
+  pasted && pasted.x === 1200 && pasted.y === 700,
+  pasted && `${pasted.x},${pasted.y}`,
+);
 
 const makePng = (w, h, colour) =>
   page.evaluate(
@@ -246,10 +295,27 @@ await pasteFile();
 p = await saved();
 const imgs = ofType(p, "image");
 const assetFiles = fs.readdirSync(path.join(notes, "assets")).filter((f) => f.endsWith(".png"));
-check("pasted image placed at the cursor", imgs[0] && imgs[0].x === 100 && imgs[0].y === 800, imgs[0] && `${imgs[0].x},${imgs[0].y}`);
-check("pasted image scaled to at most 800 px wide", imgs[0]?.w === 800 && imgs[0].h === 450, imgs[0] && `${imgs[0].w}x${imgs[0].h}`);
-check("image saved to assets/<sha256>.png", imgs[0] && /^assets\/[0-9a-f]{64}\.png$/.test(imgs[0].asset) && fs.existsSync(path.join(notes, imgs[0].asset)));
-check("same image pasted twice is stored once", imgs.length === 2 && assetFiles.length === 1, `${imgs.length} images, ${assetFiles.length} files`);
+check(
+  "pasted image placed at the cursor",
+  imgs[0] && imgs[0].x === 100 && imgs[0].y === 800,
+  imgs[0] && `${imgs[0].x},${imgs[0].y}`,
+);
+check(
+  "pasted image scaled to at most 800 px wide",
+  imgs[0]?.w === 800 && imgs[0].h === 450,
+  imgs[0] && `${imgs[0].w}x${imgs[0].h}`,
+);
+check(
+  "image saved to assets/<sha256>.png",
+  imgs[0] &&
+    /^assets\/[0-9a-f]{64}\.png$/.test(imgs[0].asset) &&
+    fs.existsSync(path.join(notes, imgs[0].asset)),
+);
+check(
+  "same image pasted twice is stored once",
+  imgs.length === 2 && assetFiles.length === 1,
+  `${imgs.length} images, ${assetFiles.length} files`,
+);
 
 await makePng(300, 200, "#ff5c86");
 await page.evaluate(
@@ -257,14 +323,34 @@ await page.evaluate(
     const dt = new DataTransfer();
     dt.items.add(window.__testFile);
     const target = document.querySelector(".paper-viewport");
-    target.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, clientX: x, clientY: y, bubbles: true, cancelable: true }));
-    target.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+    target.dispatchEvent(
+      new DragEvent("dragover", {
+        dataTransfer: dt,
+        clientX: x,
+        clientY: y,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    target.dispatchEvent(
+      new DragEvent("drop", {
+        dataTransfer: dt,
+        clientX: x,
+        clientY: y,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
   },
   at(1003, 803),
 );
 p = await saved();
 const dropped = ofType(p, "image").find((i) => i.w === 300);
-check("dropping an image file places it", dropped && dropped.x === 1000 && dropped.y === 800, dropped && `${dropped.x},${dropped.y}`);
+check(
+  "dropping an image file places it",
+  dropped && dropped.x === 1000 && dropped.y === 800,
+  dropped && `${dropped.x},${dropped.y}`,
+);
 
 // ---------- zoom limits ----------
 await page.mouse.move(at(600, 400).x, at(600, 400).y);
@@ -278,7 +364,11 @@ for (let i = 0; i < 40; i++) await page.mouse.wheel(0, -400);
 await page.keyboard.up("Control");
 await sleep(200);
 const maxZoom = await page.locator(".statusbar >> text=/\\d+%$/").innerText();
-check("zoom bottoms out at 25% and tops out at 300%", minZoom === "25%" && maxZoom === "300%", `${minZoom} / ${maxZoom}`);
+check(
+  "zoom bottoms out at 25% and tops out at 300%",
+  minZoom === "25%" && maxZoom === "300%",
+  `${minZoom} / ${maxZoom}`,
+);
 await key("Control+0");
 
 // ---------- performance: 500 strokes ----------
@@ -287,12 +377,32 @@ const strokes = Array.from({ length: 500 }, (_, i) => {
   const pts = [];
   for (let k = 0; k < 40; k++) pts.push(k * 6, Math.sin(k / 3 + i) * 20, 0.5);
   return {
-    id: `s${i}`, type: "stroke", tool: i % 7 === 0 ? "brush" : "pen", x: 40 + (i % 20) * 75, y: 40 + Math.floor(i / 20) * 42,
-    rotation: 0, points: pts, colour: "#F4F7FF", width: i % 7 === 0 ? 20 : 4, opacity: i % 7 === 0 ? 0.4 : 1, createdAt: now, updatedAt: now,
+    id: `s${i}`,
+    type: "stroke",
+    tool: i % 7 === 0 ? "brush" : "pen",
+    x: 40 + (i % 20) * 75,
+    y: 40 + Math.floor(i / 20) * 42,
+    rotation: 0,
+    points: pts,
+    colour: "#F4F7FF",
+    width: i % 7 === 0 ? 20 : 4,
+    opacity: i % 7 === 0 ? 0.4 : 1,
+    createdAt: now,
+    updatedAt: now,
   };
 });
-const heavy = { schemaVersion: 1, id: "heavy", title: "Five hundred strokes", createdAt: "2026-11-06T09:00:00.000Z", updatedAt: now, elements: strokes };
-fs.writeFileSync(path.join(pages, "2026-11-06-five-hundred-strokes.page.json"), JSON.stringify(heavy));
+const heavy = {
+  schemaVersion: 1,
+  id: "heavy",
+  title: "Five hundred strokes",
+  createdAt: "2026-11-06T09:00:00.000Z",
+  updatedAt: now,
+  elements: strokes,
+};
+fs.writeFileSync(
+  path.join(pages, "2026-11-06-five-hundred-strokes.page.json"),
+  JSON.stringify(heavy),
+);
 await page.reload();
 await page.waitForSelector("#page-title-input");
 await blur();
@@ -300,7 +410,10 @@ if ((await page.inputValue("#page-title-input")) !== "Five hundred strokes") {
   await page.click('button[aria-label="Next page"]');
   await sleep(500);
 }
-check("500-stroke page opens", (await page.inputValue("#page-title-input")) === "Five hundred strokes");
+check(
+  "500-stroke page opens",
+  (await page.inputValue("#page-title-input")) === "Five hundred strokes",
+);
 await sleep(500);
 
 const stats = await page.evaluate(async () => {
@@ -315,9 +428,18 @@ const stats = await page.evaluate(async () => {
   };
   requestAnimationFrame(loop);
   const wheel = (dy, ctrl) =>
-    document.querySelector(".paper-viewport canvas").dispatchEvent(
-      new WheelEvent("wheel", { deltaY: dy, ctrlKey: ctrl, clientX: vp.x + vp.width / 2, clientY: vp.y + vp.height / 2, bubbles: true, cancelable: true }),
-    );
+    document
+      .querySelector(".paper-viewport canvas")
+      .dispatchEvent(
+        new WheelEvent("wheel", {
+          deltaY: dy,
+          ctrlKey: ctrl,
+          clientX: vp.x + vp.width / 2,
+          clientY: vp.y + vp.height / 2,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
   const wait = () => new Promise((r) => requestAnimationFrame(() => r()));
   for (let i = 0; i < 60; i++) {
     wheel(i < 30 ? 60 : -60, true); // zoom out then in
@@ -330,7 +452,12 @@ const stats = await page.evaluate(async () => {
   running = false;
   const f = frames.slice(2).sort((a, b) => a - b);
   const avg = f.reduce((a, b) => a + b, 0) / f.length;
-  return { frames: f.length, avgMs: avg, p95Ms: f[Math.floor(f.length * 0.95)], maxMs: f[f.length - 1] };
+  return {
+    frames: f.length,
+    avgMs: avg,
+    p95Ms: f[Math.floor(f.length * 0.95)],
+    maxMs: f[f.length - 1],
+  };
 });
 check(
   "pan and zoom stay smooth with 500 strokes (avg < 25 ms, p95 < 40 ms per frame)",

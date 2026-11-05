@@ -59,7 +59,16 @@ export function makeLine(
   colour: string,
   width: number,
 ): ElementOf<"line"> | ElementOf<"arrow"> {
-  const base = { id: newId(), x: x1, y: y1, rotation: 0, points: [0, 0, x2 - x1, y2 - y1] as [number, number, number, number], colour, width, ...stamp() };
+  const base = {
+    id: newId(),
+    x: x1,
+    y: y1,
+    rotation: 0,
+    points: [0, 0, x2 - x1, y2 - y1] as [number, number, number, number],
+    colour,
+    width,
+    ...stamp(),
+  };
   return type === "line" ? { ...base, type: "line" } : { ...base, type: "arrow" };
 }
 
@@ -70,16 +79,49 @@ export function makeShape(
   width: number,
   dashed: boolean,
 ): ElementOf<"rect"> | ElementOf<"ellipse"> {
-  const base = { id: newId(), x: box.x, y: box.y, rotation: 0, w: box.w, h: box.h, colour, width, dashed, ...stamp() };
+  const base = {
+    id: newId(),
+    x: box.x,
+    y: box.y,
+    rotation: 0,
+    w: box.w,
+    h: box.h,
+    colour,
+    width,
+    dashed,
+    ...stamp(),
+  };
   return type === "rect" ? { ...base, type: "rect" } : { ...base, type: "ellipse" };
 }
 
-export function makeText(x: number, y: number, colour: string, heading: boolean, text = ""): ElementOf<"text"> {
+export function makeText(
+  x: number,
+  y: number,
+  colour: string,
+  heading: boolean,
+  text = "",
+): ElementOf<"text"> {
   const s = heading ? TEXT_STYLE.heading : TEXT_STYLE.note;
-  return { id: newId(), type: "text", x, y, rotation: 0, text, w: s.w, fontSize: s.fontSize, colour, heading, ...stamp() };
+  return {
+    id: newId(),
+    type: "text",
+    x,
+    y,
+    rotation: 0,
+    text,
+    w: s.w,
+    fontSize: s.fontSize,
+    colour,
+    heading,
+    ...stamp(),
+  };
 }
 
-export function makeChecklist(x: number, y: number, texts: string[] = [""]): ElementOf<"checklist"> {
+export function makeChecklist(
+  x: number,
+  y: number,
+  texts: string[] = [""],
+): ElementOf<"checklist"> {
   return {
     id: newId(),
     type: "checklist",
@@ -92,7 +134,13 @@ export function makeChecklist(x: number, y: number, texts: string[] = [""]): Ele
   };
 }
 
-export function makeImage(asset: string, x: number, y: number, w: number, h: number): ElementOf<"image"> {
+export function makeImage(
+  asset: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): ElementOf<"image"> {
   return { id: newId(), type: "image", asset, x, y, rotation: 0, w, h, ...stamp() };
 }
 
@@ -104,7 +152,13 @@ export function checklistFromLines(previous: ChecklistItem[], lines: string[]): 
   });
 }
 
-export type TransformInput = { x: number; y: number; rotation: number; scaleX: number; scaleY: number };
+export type TransformInput = {
+  x: number;
+  y: number;
+  rotation: number;
+  scaleX: number;
+  scaleY: number;
+};
 
 /**
  * Bakes a Konva transform (position, rotation, scale) into the element so the
@@ -130,7 +184,9 @@ export function applyTransform(el: Element, t: TransformInput, grid: number | nu
     case "checklist":
       return { ...el, ...common, w: g(el.w * sx) };
     case "stroke": {
-      const points = el.points.map((v, i) => (i % 3 === 0 ? round(v * sx) : i % 3 === 1 ? round(v * sy) : v));
+      const points = el.points.map((v, i) =>
+        i % 3 === 0 ? round(v * sx) : i % 3 === 1 ? round(v * sy) : v,
+      );
       return { ...el, ...common, points };
     }
     case "line":
@@ -168,11 +224,21 @@ export function restyle(el: Element, style: { colour?: string; width?: number })
     case "text":
       return style.colour ? { ...el, colour: style.colour, updatedAt } : el;
     case "stroke": {
-      const width = style.width !== undefined ? (el.tool === "brush" ? style.width * BRUSH_WIDTH_FACTOR : style.width) : el.width;
+      const width =
+        style.width !== undefined
+          ? el.tool === "brush"
+            ? style.width * BRUSH_WIDTH_FACTOR
+            : style.width
+          : el.width;
       return { ...el, colour: style.colour ?? el.colour, width, updatedAt };
     }
     default:
-      return { ...el, colour: style.colour ?? el.colour, width: style.width ?? el.width, updatedAt };
+      return {
+        ...el,
+        colour: style.colour ?? el.colour,
+        width: style.width ?? el.width,
+        updatedAt,
+      };
   }
 }
 
@@ -207,7 +273,8 @@ export function strokePath(el: ElementOf<"stroke">): string {
 export function pathFromOutline(outline: number[][]): string {
   if (outline.length === 0) return "";
   let d = `M${outline[0][0].toFixed(1)},${outline[0][1].toFixed(1)}`;
-  for (let i = 1; i < outline.length; i++) d += `L${outline[i][0].toFixed(1)},${outline[i][1].toFixed(1)}`;
+  for (let i = 1; i < outline.length; i++)
+    d += `L${outline[i][0].toFixed(1)},${outline[i][1].toFixed(1)}`;
   return d + "Z";
 }
 

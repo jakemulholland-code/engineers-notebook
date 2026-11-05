@@ -30,7 +30,12 @@ export function ToolOptions() {
     return (
       <div className="tool-options" role="radiogroup" aria-label="Text kind">
         {TEXT_KINDS.map((k) => (
-          <button key={k.id} role="radio" aria-checked={textKind === k.id} onClick={() => setTextKind(k.id)}>
+          <button
+            key={k.id}
+            role="radio"
+            aria-checked={textKind === k.id}
+            onClick={() => setTextKind(k.id)}
+          >
             {k.label}
           </button>
         ))}

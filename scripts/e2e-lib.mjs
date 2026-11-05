@@ -43,14 +43,35 @@ export async function setupClient(page, name) {
   fs.mkdirSync(client, { recursive: true });
   await page.evaluate(
     ({ folder, name }) =>
-      window.__TAURI_INTERNALS__.invoke("prepare_client_folder", { folder, name, colour: "#01C6A3", allowForeign: false }),
+      window.__TAURI_INTERNALS__.invoke("prepare_client_folder", {
+        folder,
+        name,
+        colour: "#01C6A3",
+        allowForeign: false,
+      }),
     { folder: client, name },
   );
   const cfgPath = path.join(scratch, "appdata", "config.json");
   const cfg = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, "utf8")) : {};
-  cfg.tabs = [{ id: `tab-${name}`, name, colour: "#01C6A3", folder: client, order: 0, archived: false, excludeFromAi: false }];
+  cfg.tabs = [
+    {
+      id: `tab-${name}`,
+      name,
+      colour: "#01C6A3",
+      folder: client,
+      order: 0,
+      archived: false,
+      excludeFromAi: false,
+    },
+  ];
   cfg.lastOpened = {};
-  cfg.general = { ...(cfg.general ?? {}), lockToGrid: true, gridSize: 20, inkColour: "#F4F7FF", strokeWidth: 4 };
+  cfg.general = {
+    ...(cfg.general ?? {}),
+    lockToGrid: true,
+    gridSize: 20,
+    inkColour: "#F4F7FF",
+    strokeWidth: 4,
+  };
   fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
   fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
   await page.reload();

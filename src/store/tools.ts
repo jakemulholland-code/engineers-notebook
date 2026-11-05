@@ -1,16 +1,7 @@
 import { create } from "zustand";
 
 export type ToolId =
-  | "select"
-  | "pen"
-  | "brush"
-  | "line"
-  | "arrow"
-  | "rect"
-  | "ellipse"
-  | "text"
-  | "image"
-  | "eraser";
+  "select" | "pen" | "brush" | "line" | "arrow" | "rect" | "ellipse" | "text" | "image" | "eraser";
 
 export type TextKind = "note" | "heading" | "checklist";
 

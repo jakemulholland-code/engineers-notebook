@@ -36,7 +36,11 @@ const TOOLS: { id: ToolId; label: string; key: string; icon: ReactNode }[] = [
 ];
 
 const WIDTH_DOT: Record<number, number> = { 2: 4, 4: 8, 8: 13 };
-const WIDTH_LABEL: Record<number, string> = { 2: "Fine stroke", 4: "Medium stroke", 8: "Thick stroke" };
+const WIDTH_LABEL: Record<number, string> = {
+  2: "Fine stroke",
+  4: "Medium stroke",
+  8: "Thick stroke",
+};
 
 export function Toolbar() {
   const tool = useTools((s) => s.tool);
@@ -125,17 +129,34 @@ export function Toolbar() {
       </label>
 
       <div className="toolbar-end">
-        <button className="icon-button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.canUndo} onClick={undo}>
+        <button
+          className="icon-button"
+          aria-label="Undo"
+          title="Undo (Ctrl+Z)"
+          disabled={!history.canUndo}
+          onClick={undo}
+        >
           <UndoIcon />
         </button>
-        <button className="icon-button" aria-label="Redo" title="Redo (Ctrl+Y)" disabled={!history.canRedo} onClick={redo}>
+        <button
+          className="icon-button"
+          aria-label="Redo"
+          title="Redo (Ctrl+Y)"
+          disabled={!history.canRedo}
+          onClick={redo}
+        >
           <RedoIcon />
         </button>
         <button className="pill primary" disabled title="AI catch-up arrives in milestone 4">
           <CatchUpIcon size={18} />
           Catch me up
         </button>
-        <button className="icon-button" aria-label="Settings" title="Settings (Ctrl+,)" onClick={() => openSettings(true)}>
+        <button
+          className="icon-button"
+          aria-label="Settings"
+          title="Settings (Ctrl+,)"
+          onClick={() => openSettings(true)}
+        >
           <GearIcon />
         </button>
       </div>

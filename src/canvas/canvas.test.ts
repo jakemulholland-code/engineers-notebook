@@ -16,7 +16,14 @@ import { boxFromCorners, lockAngle, snap, snapPoint, squareCorner } from "./geom
 import { HISTORY_LIMIT, emptyHistory, record, redo, undo } from "./history";
 
 const validPage = (elements: Element[]) =>
-  PageSchema.safeParse({ schemaVersion: 1, id: "p", title: "t", createdAt: "x", updatedAt: "x", elements }).success;
+  PageSchema.safeParse({
+    schemaVersion: 1,
+    id: "p",
+    title: "t",
+    createdAt: "x",
+    updatedAt: "x",
+    elements,
+  }).success;
 
 describe("grid snapping", () => {
   it("snaps to the nearest 20 px", () => {
@@ -47,7 +54,12 @@ describe("Shift-locked lines", () => {
 
 describe("boxes", () => {
   it("normalises a drag in any direction", () => {
-    expect(boxFromCorners({ x: 100, y: 80 }, { x: 40, y: 20 })).toEqual({ x: 40, y: 20, w: 60, h: 60 });
+    expect(boxFromCorners({ x: 100, y: 80 }, { x: 40, y: 20 })).toEqual({
+      x: 40,
+      y: 20,
+      w: 60,
+      h: 60,
+    });
   });
 
   it("squares a circle drag", () => {
@@ -160,9 +172,15 @@ describe("duplicate, restyle, checklist edits", () => {
   });
 
   it("leaves images alone when restyled", () => {
-    const img = { ...makeShape("rect", { x: 0, y: 0, w: 1, h: 1 }, "#fff", 2, false), type: "image" as const, asset: "assets/a.png" };
+    const img = {
+      ...makeShape("rect", { x: 0, y: 0, w: 1, h: 1 }, "#fff", 2, false),
+      type: "image" as const,
+      asset: "assets/a.png",
+    };
     const { colour: _c, width: _w, dashed: _d, ...rest } = img;
-    void _c; void _w; void _d;
+    void _c;
+    void _w;
+    void _d;
     expect(restyle(rest, { colour: "#000" })).toBe(rest);
   });
 

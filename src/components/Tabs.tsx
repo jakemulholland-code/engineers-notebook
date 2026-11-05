@@ -1,5 +1,8 @@
 import { useNotebook, visibleTabs } from "../store/notebook";
 import { BellIcon, PlusIcon } from "./Icons";
+import { fromYmd } from "../reminders/dates";
+import { overdueCount } from "../reminders/index";
+import { useReminderIndex, useToday } from "../reminders/useReminders";
 
 export function Tabs() {
   const config = useNotebook((s) => s.config);
@@ -8,6 +11,9 @@ export function Tabs() {
   const openReminders = useNotebook((s) => s.openReminders);
   const openSettings = useNotebook((s) => s.setSettingsOpen);
   const tabs = visibleTabs(config);
+  const { index } = useReminderIndex();
+  const today = useToday();
+  const overdue = overdueCount(index, fromYmd(today));
 
   return (
     <nav className="tabs" aria-label="Notebook tabs">
@@ -30,6 +36,11 @@ export function Tabs() {
       >
         <BellIcon size={16} />
         <span className="name">Reminders</span>
+        {overdue > 0 && (
+          <span className="badge" aria-label={`${overdue} overdue`} title={`${overdue} overdue`}>
+            {overdue}
+          </span>
+        )}
       </button>
       <button className="tab new" onClick={() => openSettings(true)}>
         <PlusIcon size={14} />

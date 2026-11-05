@@ -1,7 +1,8 @@
 import Konva from "konva";
 import { memo } from "react";
 import { Arrow, Ellipse, Group, Image as KImage, Line, Path, Rect, Text } from "react-konva";
-import type { Element } from "../model/page";
+import type { DateTag, Element } from "../model/page";
+import { fromYmd, isOverdue, pillLabel } from "../reminders/dates";
 import { useAsset } from "./assets";
 import { TEXT_STYLE, strokePath } from "./elements";
 
@@ -19,40 +20,193 @@ export function token(name: string): string {
 export const FONT_BODY = "Satoshi, 'Helvetica Neue', Arial, sans-serif";
 export const FONT_DISPLAY = "'Bricolage Grotesque', Satoshi, sans-serif";
 export const LINE_HEIGHT = 1.4;
+export const HEADING_LINE_HEIGHT = 1.15;
 export const CHECK_SIZE = 18;
 export const CHECK_GAP = 10;
 export const ROW_GAP = 10;
+export const PILL_H = 24;
+const PILL_GAP = 10;
+const PILL_FONT = 13;
 
 const HIT = 14;
 
-// ----- text measuring for checklist rows -----
+// ----- text measuring -----
 
 let measurer: Konva.Text | null = null;
 const measureCache = new Map<string, number>();
 export function clearMeasureCache() {
   measureCache.clear();
 }
-export function measureTextHeight(text: string, width: number, fontSize: number): number {
-  const k = `${fontSize}|${width}|${text}`;
+
+type Font = {
+  fontSize: number;
+  fontFamily?: string;
+  fontStyle?: string;
+  lineHeight?: number;
+  letterSpacing?: number;
+};
+
+function measurerWith(font: Font): Konva.Text {
+  measurer ??= new Konva.Text({ wrap: "word" });
+  measurer.setAttrs({
+    fontFamily: font.fontFamily ?? FONT_BODY,
+    fontStyle: font.fontStyle ?? "normal",
+    lineHeight: font.lineHeight ?? LINE_HEIGHT,
+    letterSpacing: font.letterSpacing ?? 0,
+    fontSize: font.fontSize,
+  });
+  return measurer;
+}
+
+export function measureTextHeight(text: string, width: number, font: Font): number {
+  const k = `h|${JSON.stringify(font)}|${width}|${text}`;
   const hit = measureCache.get(k);
   if (hit !== undefined) return hit;
-  measurer ??= new Konva.Text({ fontFamily: FONT_BODY, lineHeight: LINE_HEIGHT, wrap: "word" });
-  measurer.setAttrs({ text: text || " ", width, fontSize });
-  const h = measurer.height();
+  const m = measurerWith(font);
+  m.setAttrs({ text: text || " ", width });
+  const h = m.height();
   measureCache.set(k, h);
   return h;
 }
+
+function measureTextWidth(text: string, font: Font): number {
+  const k = `w|${JSON.stringify(font)}|${text}`;
+  const hit = measureCache.get(k);
+  if (hit !== undefined) return hit;
+  const w = measurerWith(font).measureSize(text).width;
+  measureCache.set(k, w);
+  return w;
+}
+
+const textFont = (el: Extract<Element, { type: "text" }>): Font =>
+  el.heading
+    ? {
+        fontSize: el.fontSize,
+        fontFamily: FONT_DISPLAY,
+        fontStyle: "600",
+        lineHeight: HEADING_LINE_HEIGHT,
+        letterSpacing: -0.02 * el.fontSize,
+      }
+    : { fontSize: el.fontSize };
 
 export function checklistRows(el: Extract<Element, { type: "checklist" }>) {
   const fontSize = TEXT_STYLE.checklist.fontSize;
   const textW = Math.max(40, el.w - CHECK_SIZE - CHECK_GAP);
   let y = 0;
   return el.items.map((item) => {
-    const h = Math.max(CHECK_SIZE + 2, measureTextHeight(item.text, textW, fontSize));
-    const row = { item, y, h, textW, fontSize };
+    const textH = Math.max(CHECK_SIZE + 2, measureTextHeight(item.text, textW, { fontSize }));
+    const h = textH + (item.date ? PILL_H + 8 : 0);
+    const row = { item, y, h, textH, textW, fontSize };
     y += h + ROW_GAP;
     return row;
   });
+}
+
+/** Where an element's date pill goes: just below its bottom-left, in local coords. */
+export function pillAnchor(el: Element): { x: number; y: number } {
+  const below = (y: number) => y + PILL_GAP;
+  switch (el.type) {
+    case "text":
+      return { x: 0, y: below(measureTextHeight(el.text, el.w, textFont(el))) };
+    case "checklist": {
+      const rows = checklistRows(el);
+      const last = rows[rows.length - 1];
+      return { x: 0, y: below(last ? last.y + last.h : CHECK_SIZE) };
+    }
+    case "rect":
+    case "ellipse":
+    case "image":
+      return { x: 0, y: below(el.h) };
+    case "line":
+    case "arrow":
+      return {
+        x: Math.min(el.points[0], el.points[2]),
+        y: below(Math.max(el.points[1], el.points[3]) + el.width),
+      };
+    case "stroke": {
+      let minX = 0;
+      let maxY = 0;
+      for (let i = 0; i + 1 < el.points.length; i += 3) {
+        minX = Math.min(minX, el.points[i]);
+        maxY = Math.max(maxY, el.points[i + 1]);
+      }
+      return { x: minX, y: below(maxY + el.width / 2) };
+    }
+  }
+}
+
+// ----- date pill -----
+
+export function pillColours(
+  tag: DateTag,
+  today: Date,
+): { stroke: string; fill: string; text: string } {
+  if (tag.done)
+    return { stroke: token("--line-strong"), fill: "transparent", text: token("--text-muted") };
+  if (isOverdue(tag, today))
+    return { stroke: token("--pink"), fill: token("--pink-wash"), text: token("--pink-pale") };
+  if (tag.kind === "due")
+    return { stroke: token("--gold"), fill: token("--gold-wash"), text: token("--gold-soft") };
+  if (tag.kind === "follow_up")
+    return {
+      stroke: token("--pale-blue"),
+      fill: token("--pale-blue-wash"),
+      text: token("--pale-blue-soft"),
+    };
+  return { stroke: token("--text-muted"), fill: token("--muted-wash"), text: token("--text") };
+}
+
+type PillProps = {
+  tag: DateTag;
+  today: string;
+  x: number;
+  y: number;
+  onClick?: () => void;
+};
+
+function Pill({ tag, today, x, y, onClick }: PillProps) {
+  const todayDate = fromYmd(today);
+  const label = pillLabel(tag, todayDate);
+  const font: Font = { fontSize: PILL_FONT, fontStyle: "bold", lineHeight: 1 };
+  const w = 30 + measureTextWidth(label, font) + 12;
+  const c = pillColours(tag, todayDate);
+  const handle = (e: Konva.KonvaEventObject<Event>) => {
+    e.cancelBubble = true;
+    onClick?.();
+  };
+  return (
+    <Group x={x} y={y} name="date-pill" onClick={handle} onTap={handle}>
+      <Rect
+        width={w}
+        height={PILL_H}
+        cornerRadius={PILL_H / 2}
+        stroke={c.stroke}
+        strokeWidth={1.5}
+        fill={c.fill}
+      />
+      <Rect
+        x={11}
+        y={6}
+        width={12}
+        height={11}
+        cornerRadius={2}
+        stroke={c.text}
+        strokeWidth={1.4}
+      />
+      <Line points={[11, 9.5, 23, 9.5]} stroke={c.text} strokeWidth={1.4} />
+      <Text
+        x={30}
+        y={(PILL_H - PILL_FONT) / 2 + 0.5}
+        text={label}
+        fontSize={PILL_FONT}
+        fontStyle="bold"
+        fontFamily={FONT_BODY}
+        lineHeight={1}
+        fill={c.text}
+        textDecoration={tag.done ? "line-through" : ""}
+      />
+    </Group>
+  );
 }
 
 // ----- the node -----
@@ -62,13 +216,18 @@ type Props = {
   notesPath: string;
   draggable: boolean;
   hidden: boolean;
+  /** Today's date (YYYY-MM-DD), so pills turn pink when overdue. */
+  today: string;
   dragBoundFunc?: (pos: Konva.Vector2d) => Konva.Vector2d;
   onDragEnd?: (e: Konva.KonvaEventObject<DragEvent>) => void;
   onDblClick?: (id: string) => void;
   onToggleItem?: (elementId: string, itemId: string) => void;
+  onPillClick?: (elementId: string, itemId?: string) => void;
 };
 
-function ElementNodeImpl({ el, notesPath, draggable, hidden, dragBoundFunc, onDragEnd, onDblClick, onToggleItem }: Props) {
+function ElementNodeImpl(p: Props) {
+  const { el } = p;
+  const anchor = el.date ? pillAnchor(el) : null;
   return (
     <Group
       id={el.id}
@@ -76,29 +235,30 @@ function ElementNodeImpl({ el, notesPath, draggable, hidden, dragBoundFunc, onDr
       x={el.x}
       y={el.y}
       rotation={el.rotation}
-      draggable={draggable}
-      visible={!hidden}
-      dragBoundFunc={dragBoundFunc}
-      onDragEnd={onDragEnd}
-      onDblClick={() => onDblClick?.(el.id)}
-      onDblTap={() => onDblClick?.(el.id)}
+      draggable={p.draggable}
+      visible={!p.hidden}
+      dragBoundFunc={p.dragBoundFunc}
+      onDragEnd={p.onDragEnd}
+      onDblClick={() => p.onDblClick?.(el.id)}
+      onDblTap={() => p.onDblClick?.(el.id)}
     >
-      <Body el={el} notesPath={notesPath} onToggleItem={onToggleItem} />
+      <Body {...p} />
+      {el.date && anchor && (
+        <Pill
+          tag={el.date}
+          today={p.today}
+          x={anchor.x}
+          y={anchor.y}
+          onClick={() => p.onPillClick?.(el.id)}
+        />
+      )}
     </Group>
   );
 }
 
 export const ElementNode = memo(ElementNodeImpl);
 
-function Body({
-  el,
-  notesPath,
-  onToggleItem,
-}: {
-  el: Element;
-  notesPath: string;
-  onToggleItem?: (elementId: string, itemId: string) => void;
-}) {
+function Body({ el, notesPath, today, onToggleItem, onPillClick }: Props) {
   switch (el.type) {
     case "stroke":
       return (
@@ -114,7 +274,14 @@ function Body({
       );
     case "line":
       return (
-        <Line points={el.points} stroke={el.colour} strokeWidth={el.width} lineCap="round" hitStrokeWidth={HIT} perfectDrawEnabled={false} />
+        <Line
+          points={el.points}
+          stroke={el.colour}
+          strokeWidth={el.width}
+          lineCap="round"
+          hitStrokeWidth={HIT}
+          perfectDrawEnabled={false}
+        />
       );
     case "arrow":
       return (
@@ -158,22 +325,26 @@ function Body({
           perfectDrawEnabled={false}
         />
       );
-    case "text":
+    case "text": {
+      const f = textFont(el);
       return (
         <Text
           text={el.text}
           width={el.w}
-          fontSize={el.fontSize}
-          fontFamily={el.heading ? FONT_DISPLAY : FONT_BODY}
-          fontStyle={el.heading ? "600" : "normal"}
-          letterSpacing={el.heading ? -0.02 * el.fontSize : 0}
-          lineHeight={el.heading ? 1.15 : LINE_HEIGHT}
+          fontSize={f.fontSize}
+          fontFamily={f.fontFamily ?? FONT_BODY}
+          fontStyle={f.fontStyle ?? "normal"}
+          letterSpacing={f.letterSpacing ?? 0}
+          lineHeight={f.lineHeight ?? LINE_HEIGHT}
           fill={el.colour}
           wrap="word"
         />
       );
+    }
     case "checklist":
-      return <Checklist el={el} onToggleItem={onToggleItem} />;
+      return (
+        <Checklist el={el} today={today} onToggleItem={onToggleItem} onPillClick={onPillClick} />
+      );
     case "image":
       return <ImageBody el={el} notesPath={notesPath} />;
   }
@@ -181,10 +352,14 @@ function Body({
 
 function Checklist({
   el,
+  today,
   onToggleItem,
+  onPillClick,
 }: {
   el: Extract<Element, { type: "checklist" }>;
+  today: string;
   onToggleItem?: (elementId: string, itemId: string) => void;
+  onPillClick?: (elementId: string, itemId?: string) => void;
 }) {
   const ink = token("--ink-white");
   const mint = token("--mint");
@@ -195,8 +370,8 @@ function Checklist({
     <>
       {/* Invisible backing so the whole list is clickable and draggable. */}
       <Rect width={el.w} height={total} fill="rgba(0,0,0,0.001)" />
-      {rows.map(({ item, y, textW, fontSize }) => (
-        <Group key={item.id} y={y}>
+      {rows.map(({ item, y, textH, textW, fontSize }) => (
+        <Group key={item.id} y={y} name={`checklist-item ci-${item.id}`}>
           <Group
             name="checkbox"
             onClick={(e) => {
@@ -208,8 +383,24 @@ function Checklist({
               onToggleItem?.(el.id, item.id);
             }}
           >
-            <Rect y={2} width={CHECK_SIZE} height={CHECK_SIZE} stroke={item.done ? mint : ink} strokeWidth={2} hitStrokeWidth={8} fill="rgba(0,0,0,0.001)" />
-            {item.done && <Line points={[4, 11, 8, 15, 14, 6]} y={0} stroke={mint} strokeWidth={2} lineCap="round" lineJoin="round" />}
+            <Rect
+              y={2}
+              width={CHECK_SIZE}
+              height={CHECK_SIZE}
+              stroke={item.done ? mint : ink}
+              strokeWidth={2}
+              hitStrokeWidth={8}
+              fill="rgba(0,0,0,0.001)"
+            />
+            {item.done && (
+              <Line
+                points={[4, 11, 8, 15, 14, 6]}
+                stroke={mint}
+                strokeWidth={2}
+                lineCap="round"
+                lineJoin="round"
+              />
+            )}
           </Group>
           <Text
             x={CHECK_SIZE + CHECK_GAP}
@@ -222,16 +413,39 @@ function Checklist({
             textDecoration={item.done ? "line-through" : ""}
             wrap="word"
           />
+          {item.date && (
+            <Pill
+              tag={item.date}
+              today={today}
+              x={CHECK_SIZE + CHECK_GAP}
+              y={textH + 6}
+              onClick={() => onPillClick?.(el.id, item.id)}
+            />
+          )}
         </Group>
       ))}
     </>
   );
 }
 
-function ImageBody({ el, notesPath }: { el: Extract<Element, { type: "image" }>; notesPath: string }) {
+function ImageBody({
+  el,
+  notesPath,
+}: {
+  el: Extract<Element, { type: "image" }>;
+  notesPath: string;
+}) {
   const img = useAsset(notesPath, el.asset);
   if (!img) {
-    return <Rect width={el.w} height={el.h} stroke={token("--line-strong")} dash={[6, 6]} strokeWidth={2} />;
+    return (
+      <Rect
+        width={el.w}
+        height={el.h}
+        stroke={token("--line-strong")}
+        dash={[6, 6]}
+        strokeWidth={2}
+      />
+    );
   }
   return (
     <KImage

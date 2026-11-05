@@ -29,6 +29,10 @@ import {
 } from "./elements";
 import { boxFromCorners, lockAngle, snap, snapPoint, squareCorner, type Point } from "./geometry";
 import { TextEditor } from "./TextEditor";
+import { ContextMenu, type MenuItem } from "../components/ContextMenu";
+import { DatePopover } from "../components/DatePopover";
+import { useToday } from "../reminders/useReminders";
+import type { DateTag } from "../model/page";
 import { ToolOptions } from "./ToolOptions";
 
 const TITLE_X = 60;
@@ -176,9 +180,13 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
     [clamp, setZoom],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = wrapRef.current;
     if (!el) return;
+    // Measure now, so anything that centres the view on mount uses the real size.
+    const r = el.getBoundingClientRect();
+    sizeRef.current = { w: r.width, h: r.height };
+    setSize(sizeRef.current);
     const ro = new ResizeObserver(([entry]) =>
       setSize({ w: entry.contentRect.width, h: entry.contentRect.height }),
     );
@@ -197,6 +205,8 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
     setSelected([]);
     setEditing(null);
     setDraft(null);
+    setDating(null);
+    setMenu(null);
   }, [page.id, setSelected, applyView]);
 
   useEffect(() => {
@@ -319,6 +329,157 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
     },
     [editElements],
   );
+
+  // ---------- dates ----------
+
+  const today = useToday();
+  const [dating, setDating] = useState<{
+    elementId: string;
+    itemId?: string;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [menu, setMenu] = useState<{
+    x: number;
+    y: number;
+    elementId: string;
+    itemId?: string;
+  } | null>(null);
+
+  /** Opens "Date this item" under an element (or one checklist row). */
+  const openDating = useCallback((elementId: string, itemId?: string) => {
+    const layer = layerRef.current;
+    const node = layer?.findOne<Konva.Group>(`#${elementId}`);
+    if (!layer || !node) return;
+    const target = (itemId && node.findOne(`.ci-${itemId}`)) || node;
+    const r = target.getClientRect({ relativeTo: layer });
+    setMenu(null);
+    setDating({ elementId, itemId, x: r.x, y: r.y + r.height });
+  }, []);
+
+  const datingTag = useMemo(() => {
+    if (!dating) return undefined;
+    const el = page.elements.find((e) => e.id === dating.elementId);
+    if (!el) return undefined;
+    if (dating.itemId && el.type === "checklist")
+      return el.items.find((i) => i.id === dating.itemId)?.date;
+    return el.date;
+  }, [dating, page.elements]);
+
+  const writeDate = (target: { elementId: string; itemId?: string }, tag: DateTag | undefined) => {
+    const now = new Date().toISOString();
+    editElements((els) =>
+      els.map((el) => {
+        if (el.id !== target.elementId) return el;
+        if (target.itemId && el.type === "checklist") {
+          return {
+            ...el,
+            updatedAt: now,
+            items: el.items.map((i) =>
+              // An item's date follows its tick box.
+              i.id !== target.itemId
+                ? i
+                : { ...i, date: tag ? { ...tag, done: i.done } : undefined },
+            ),
+          };
+        }
+        return { ...el, date: tag, updatedAt: now };
+      }),
+    );
+  };
+
+  const onContextMenu = (e: Konva.KonvaEventObject<PointerEvent>) => {
+    e.evt.preventDefault();
+    if (readOnly) return;
+    const node = e.target.findAncestor(".element", true);
+    if (!node) {
+      setMenu(null);
+      return;
+    }
+    const id = node.id();
+    if (!live.current.selected.includes(id)) setSelected([id]);
+    const row = e.target.findAncestor(".checklist-item", true);
+    const itemId = row
+      ?.name()
+      .split(" ")
+      .find((n) => n.startsWith("ci-"))
+      ?.slice(3);
+    setMenu({ x: e.evt.clientX, y: e.evt.clientY, elementId: id, itemId });
+  };
+
+  const menuItems = (): MenuItem[] => {
+    if (!menu) return [];
+    const el = page.elements.find((x) => x.id === menu.elementId);
+    if (!el) return [];
+    const items: MenuItem[] = [];
+    if (menu.itemId && el.type === "checklist") {
+      const item = el.items.find((i) => i.id === menu.itemId);
+      items.push({
+        label: item?.date ? "Edit date for this item" : "Add date to this item",
+        onSelect: () => openDating(el.id, menu.itemId),
+      });
+    }
+    items.push({ label: el.date ? "Edit date" : "Add date", onSelect: () => openDating(el.id) });
+    items.push({
+      label: "Duplicate",
+      onSelect: () => {
+        const copy = duplicate(el, grid, grid);
+        editElements((els) => [...els, copy]);
+        setSelected([copy.id]);
+      },
+    });
+    items.push({
+      label: "Delete",
+      danger: true,
+      onSelect: () => {
+        editElements((els) => els.filter((x) => x.id !== el.id));
+        setSelected([]);
+      },
+    });
+    return items;
+  };
+
+  // ---------- flash an element opened from Reminders ----------
+
+  const flash = useNotebook((s) => s.flash);
+  const [flashBox, setFlashBox] = useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+    key: number;
+  } | null>(null);
+  const flashRef = useRef<Konva.Rect>(null);
+
+  useEffect(() => {
+    if (!flash) return;
+    const layer = layerRef.current;
+    const node = layer?.findOne(`#${flash.elementId}`);
+    useNotebook.getState().clearFlash();
+    if (!layer || !node) return;
+    const r = node.getClientRect({ relativeTo: layer });
+    const z = view.current.zoom;
+    const s = sizeRef.current;
+    applyView(s.w / 2 - (r.x + r.width / 2) * z, s.h / 2 - (r.y + r.height / 2) * z, z);
+    setTool("select");
+    setSelected([flash.elementId]);
+    setFlashBox({ x: r.x - 10, y: r.y - 10, w: r.width + 20, h: r.height + 20, key: flash.nonce });
+  }, [flash, page.id, applyView, setTool, setSelected]);
+
+  useEffect(() => {
+    const n = flashRef.current;
+    if (!n || !flashBox) return;
+    n.opacity(1);
+    const tween = new Konva.Tween({
+      node: n,
+      duration: 1.8,
+      opacity: 0,
+      easing: Konva.Easings.EaseIn,
+      onFinish: () => setFlashBox(null),
+    });
+    tween.play();
+    return () => tween.destroy();
+  }, [flashBox]);
 
   // ---------- selection transformer ----------
 
@@ -730,6 +891,9 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
         setSelected(live.current.elements.map((el) => el.id));
       } else if (readOnly) {
         return;
+      } else if (!ctrl && k === "d" && sel.size === 1) {
+        e.preventDefault();
+        openDating([...sel][0]);
       } else if (ctrl && k === "d") {
         e.preventDefault();
         if (!sel.size) return;
@@ -764,7 +928,7 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
       window.removeEventListener("keydown", down);
       window.removeEventListener("keyup", up);
     };
-  }, [applyView, setTool, setSelected, grid, readOnly]);
+  }, [applyView, setTool, setSelected, grid, readOnly, openDating]);
 
   // ---------- render ----------
 
@@ -817,6 +981,8 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
           onDragEnd={onDragEnd}
           onDblClick={onDblClick}
           onToggleItem={readOnly ? undefined : onToggleItem}
+          onPillClick={readOnly ? undefined : openDating}
+          today={today}
         />
       )),
     [
@@ -828,6 +994,8 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
       onDragEnd,
       onDblClick,
       onToggleItem,
+      openDating,
+      today,
       readOnly,
     ],
   );
@@ -870,6 +1038,7 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
         onWheel={onWheel}
         onPointerDown={onPointerDown}
         onPointerMove={onStageMove}
+        onContextMenu={onContextMenu}
       >
         {/* Two layers only: each layer is a full-size canvas the browser composites every frame. */}
         <Layer ref={layerRef} listening={interactive}>
@@ -919,8 +1088,25 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
                 notesPath={notesPath}
                 draggable={false}
                 hidden={false}
+                today={today}
               />
             </Group>
+          )}
+          {flashBox && (
+            <Rect
+              key={flashBox.key}
+              ref={flashRef}
+              x={flashBox.x}
+              y={flashBox.y}
+              width={flashBox.w}
+              height={flashBox.h}
+              cornerRadius={8}
+              stroke={colours.mint}
+              strokeWidth={3}
+              shadowColor={colours.mint}
+              shadowBlur={16}
+              listening={false}
+            />
           )}
           {draft?.kind === "marquee" && (
             <Rect
@@ -997,6 +1183,28 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
         </div>
         {editing && <TextEditor key={editing.el.id} el={editing.el} onCommit={commitEditing} />}
         <ToolOptions />
+        {dating && (
+          <DatePopover
+            key={`${dating.elementId}:${dating.itemId ?? ""}`}
+            tag={datingTag}
+            style={{
+              left: `clamp(8px, calc(var(--pan-x) + ${dating.x}px * var(--zoom)), calc(100% - 596px))`,
+              top: `max(8px, min(calc(var(--pan-y) + ${dating.y}px * var(--zoom) + 8px), calc(100% - 270px)))`,
+            }}
+            onClose={() => setDating(null)}
+            onRemove={() => {
+              writeDate(dating, undefined);
+              setDating(null);
+            }}
+            onSave={(tag) => {
+              writeDate(dating, tag);
+              setDating(null);
+            }}
+          />
+        )}
+        {menu && (
+          <ContextMenu x={menu.x} y={menu.y} items={menuItems()} onClose={() => setMenu(null)} />
+        )}
       </div>
 
       <input

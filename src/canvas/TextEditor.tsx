@@ -77,7 +77,11 @@ export function TextEditor({ el, onCommit }: Props) {
           fontFamily: heading ? FONT_DISPLAY : FONT_BODY,
           fontWeight: heading ? 600 : 400,
           letterSpacing: heading ? `${-0.02 * fontSize}px` : 0,
-          lineHeight: heading ? 1.15 : isChecklist ? `${fontSize * LINE_HEIGHT + 10}px` : LINE_HEIGHT,
+          lineHeight: heading
+            ? 1.15
+            : isChecklist
+              ? `${fontSize * LINE_HEIGHT + 10}px`
+              : LINE_HEIGHT,
           color: el.type === "text" ? el.colour : "var(--ink-white)",
         }}
       />

@@ -1,10 +1,26 @@
 import { create } from "zustand";
 import { defaultConfig, parseConfig, type AppConfig, type TabConfig } from "../model/config";
-import { createPage, newId, pageFileName, uniquePageFileName, type Element, type Page } from "../model/page";
-import { emptyHistory, record, redo as redoStep, undo as undoStep, type History } from "../canvas/history";
+import {
+  createPage,
+  newId,
+  pageFileName,
+  uniquePageFileName,
+  type Element,
+  type Page,
+} from "../model/page";
+import {
+  emptyHistory,
+  record,
+  redo as redoStep,
+  undo as undoStep,
+  type History,
+} from "../canvas/history";
 import { backend } from "../storage/backend";
 import { loadTab, savePage, type LoadedPage } from "../storage/notebook";
 import { pagePath } from "../storage/paths";
+import type { ReminderIndex } from "../reminders/index";
+
+export const REMINDERS_CACHE_FILE = "reminders-cache.json";
 
 export const AUTOSAVE_DELAY_MS = 800;
 
@@ -34,7 +50,12 @@ type NotebookStore = {
 
   init(): Promise<void>;
   updateConfig(mutate: (c: AppConfig) => AppConfig): Promise<void>;
-  addClient(input: { name: string; colour: string; folder: string; notesPath: string }): Promise<void>;
+  addClient(input: {
+    name: string;
+    colour: string;
+    folder: string;
+    notesPath: string;
+  }): Promise<void>;
   changeFolder(tabId: string, folder: string, notesPath: string): Promise<void>;
   reloadTab(tabId: string): Promise<void>;
   openTab(tabId: string): void;
@@ -44,6 +65,14 @@ type NotebookStore = {
   newPage(): Promise<void>;
   goToPage(delta: number): void;
   updatePage(mutate: (p: Page) => Page): void;
+  /** Changes any loaded page (not just the current one) and autosaves it. */
+  updatePageIn(tabId: string, pageId: string, mutate: (p: Page) => Page): void;
+  /** Opens a page, optionally centring on and flashing one element. */
+  openPageAt(tabId: string, pageId: string, elementId?: string): void;
+  flash: { elementId: string; nonce: number } | null;
+  clearFlash(): void;
+  /** The reminders index saved last session, shown until every tab has loaded. */
+  cachedReminders: ReminderIndex | null;
   /** Changes the current page's elements as one undoable step. */
   editElements(mutate: (els: Element[]) => Element[]): void;
   undo(): void;
@@ -60,7 +89,8 @@ export function historyFor(pageId: string | undefined): { canUndo: boolean; canR
   return { canUndo: !!h && h.past.length > 0, canRedo: !!h && h.future.length > 0 };
 }
 
-const sameElements = (a: Element[], b: Element[]) => a.length === b.length && a.every((el, i) => el === b[i]);
+const sameElements = (a: Element[], b: Element[]) =>
+  a.length === b.length && a.every((el, i) => el === b[i]);
 
 export const visibleTabs = (c: AppConfig): TabConfig[] =>
   c.tabs.filter((t) => !t.archived).sort((a, b) => a.order - b.order);
@@ -126,7 +156,9 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       // Renaming a page renames the file (SPEC: Saving rules).
       let fileName = loaded.fileName;
       const stem = pageFileName(loaded.page).replace(/\.page\.json$/, "");
-      const matches = new RegExp(`^${stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(-\\d+)?\\.page\\.json$`);
+      const matches = new RegExp(
+        `^${stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(-\\d+)?\\.page\\.json$`,
+      );
       if (!matches.test(fileName)) {
         const taken = new Set(tab.pages.filter((p) => p !== loaded).map((p) => p.fileName));
         const next = uniquePageFileName(loaded.page, taken);
@@ -161,18 +193,24 @@ export const useNotebook = create<NotebookStore>((set, get) => {
 
     async init() {
       const config = parseConfig(await backend.readAppConfig());
-      set({ config });
       const tabs = visibleTabs(config);
-      await Promise.all(tabs.map((t) => get().reloadTab(t.id)));
       const last = config.lastOpened;
       const startTab = tabs.find((t) => t.id === last.tabId) ?? tabs[0];
-      if (startTab) {
-        set((s) => ({
-          view: { kind: "tab", tabId: startTab.id },
-          currentPage: last.pageId ? { ...s.currentPage, [startTab.id]: last.pageId } : s.currentPage,
-        }));
+      // Show the shell straight away; tabs fill in as their folders are read.
+      set({
+        config,
+        tabs: Object.fromEntries(tabs.map((t) => [t.id, { status: "loading" } as TabState])),
+        view: startTab ? { kind: "tab", tabId: startTab.id } : { kind: "empty" },
+        currentPage: startTab && last.pageId ? { [startTab.id]: last.pageId } : {},
+        ready: true,
+      });
+      try {
+        const cached = await backend.readAppFile(REMINDERS_CACHE_FILE);
+        if (cached) set({ cachedReminders: JSON.parse(cached) as ReminderIndex });
+      } catch {
+        // A missing or broken cache only means a slower first Reminders view.
       }
-      set({ ready: true });
+      await Promise.all(tabs.map((t) => get().reloadTab(t.id)));
     },
 
     async updateConfig(mutate) {
@@ -184,7 +222,15 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     async addClient({ name, colour, folder, notesPath }) {
       const id = newId();
       const order = Math.max(-1, ...get().config.tabs.map((t) => t.order)) + 1;
-      const tab: TabConfig = { id, name, colour, folder, order, archived: false, excludeFromAi: false };
+      const tab: TabConfig = {
+        id,
+        name,
+        colour,
+        folder,
+        order,
+        archived: false,
+        excludeFromAi: false,
+      };
       await get().updateConfig((c) => ({ ...c, tabs: [...c.tabs, tab] }));
       setTab(id, { status: "loading" });
       await get().reloadTab(id);
@@ -222,7 +268,9 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       const cur = currentPageOf(get());
       rememberLast(tabId, cur?.loaded.page.id);
       const ro = cur?.loaded.readOnly;
-      set({ save: ro ? { kind: "read-only", reason: cur?.loaded.warning ?? "" } : { kind: "saved" } });
+      set({
+        save: ro ? { kind: "read-only", reason: cur?.loaded.warning ?? "" } : { kind: "saved" },
+      });
       if (ro && cur?.loaded.warning) set({ notice: cur.loaded.warning });
     },
 
@@ -267,25 +315,54 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       set((s) => ({ currentPage: { ...s.currentPage, [cur.tabId]: target.page.id } }));
       rememberLast(cur.tabId, target.page.id);
       set({
-        save: target.readOnly ? { kind: "read-only", reason: target.warning ?? "" } : { kind: "saved" },
+        save: target.readOnly
+          ? { kind: "read-only", reason: target.warning ?? "" }
+          : { kind: "saved" },
         notice: target.readOnly && target.warning ? target.warning : get().notice,
       });
     },
 
     updatePage(mutate) {
       const cur = currentPageOf(get());
-      if (!cur || cur.loaded.readOnly) return;
-      const tab = get().tabs[cur.tabId];
+      if (!cur) return;
+      get().updatePageIn(cur.tabId, cur.loaded.page.id, mutate);
+    },
+
+    updatePageIn(tabId, pageId, mutate) {
+      const tab = get().tabs[tabId];
       if (tab?.status !== "ok") return;
-      const updated = { ...mutate(cur.loaded.page), updatedAt: new Date().toISOString() };
-      setTab(cur.tabId, {
+      const loaded = tab.pages.find((p) => p.page.id === pageId);
+      if (!loaded || loaded.readOnly) return;
+      const updated = { ...mutate(loaded.page), updatedAt: new Date().toISOString() };
+      setTab(tabId, {
         ...tab,
-        pages: tab.pages.map((p) => (p.page.id === updated.id ? { ...p, page: updated } : p)),
+        pages: tab.pages.map((p) => (p.page.id === pageId ? { ...p, page: updated } : p)),
       });
       set({ save: { kind: "unsaved" } });
-      const { tabId } = cur;
-      scheduleSave(`${tabId}:${updated.id}`, () => savePageNow(tabId, updated.id));
+      scheduleSave(`${tabId}:${pageId}`, () => savePageNow(tabId, pageId));
     },
+
+    flash: null,
+    clearFlash() {
+      set({ flash: null });
+    },
+
+    openPageAt(tabId, pageId, elementId) {
+      set((s) => ({
+        view: { kind: "tab", tabId },
+        currentPage: { ...s.currentPage, [tabId]: pageId },
+        flash: elementId ? { elementId, nonce: Date.now() } : null,
+      }));
+      rememberLast(tabId, pageId);
+      const cur = currentPageOf(get());
+      set({
+        save: cur?.loaded.readOnly
+          ? { kind: "read-only", reason: cur.loaded.warning ?? "" }
+          : { kind: "saved" },
+      });
+    },
+
+    cachedReminders: null,
 
     historyTick: 0,
 
@@ -305,7 +382,10 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       const cur = currentPageOf(get());
       if (!cur || cur.loaded.readOnly) return;
       const id = cur.loaded.page.id;
-      const step = undoStep(histories.get(id) ?? emptyHistory<Element[]>(), cur.loaded.page.elements);
+      const step = undoStep(
+        histories.get(id) ?? emptyHistory<Element[]>(),
+        cur.loaded.page.elements,
+      );
       if (!step) return;
       histories.set(id, step.history);
       get().updatePage((p) => ({ ...p, elements: step.value }));
@@ -316,7 +396,10 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       const cur = currentPageOf(get());
       if (!cur || cur.loaded.readOnly) return;
       const id = cur.loaded.page.id;
-      const step = redoStep(histories.get(id) ?? emptyHistory<Element[]>(), cur.loaded.page.elements);
+      const step = redoStep(
+        histories.get(id) ?? emptyHistory<Element[]>(),
+        cur.loaded.page.elements,
+      );
       if (!step) return;
       histories.set(id, step.history);
       get().updatePage((p) => ({ ...p, elements: step.value }));

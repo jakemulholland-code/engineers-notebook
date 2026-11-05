@@ -118,8 +118,7 @@ export type ChecklistItem = z.infer<typeof ChecklistItemSchema>;
 export type Page = z.infer<typeof PageSchema>;
 
 export type ParsedPage =
-  | { ok: true; page: Page; readOnly: boolean; warning?: string }
-  | { ok: false; error: string };
+  { ok: true; page: Page; readOnly: boolean; warning?: string } | { ok: false; error: string };
 
 /**
  * Parse a page file. A page written by a newer app (higher schemaVersion) opens
@@ -148,7 +147,10 @@ export function parsePage(text: string): ParsedPage {
   if (!result.success) {
     const issue = result.error.issues[0];
     const where = issue?.path.join(".") || "page";
-    return { ok: false, error: `The page file is invalid at ${where}: ${issue?.message ?? "unknown"}` };
+    return {
+      ok: false,
+      error: `The page file is invalid at ${where}: ${issue?.message ?? "unknown"}`,
+    };
   }
   return { ok: true, page: result.data, readOnly: false };
 }
@@ -190,7 +192,14 @@ export function newId(): string {
 
 export function createPage(now: Date = new Date(), title = "Untitled page"): Page {
   const iso = now.toISOString();
-  return { schemaVersion: PAGE_SCHEMA_VERSION, id: newId(), title, createdAt: iso, updatedAt: iso, elements: [] };
+  return {
+    schemaVersion: PAGE_SCHEMA_VERSION,
+    id: newId(),
+    title,
+    createdAt: iso,
+    updatedAt: iso,
+    elements: [],
+  };
 }
 
 /** Lower-case, ASCII, hyphen-separated slug; never empty. */

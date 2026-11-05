@@ -11,6 +11,8 @@ pub fn run() {
             fs::app_config_path,
             fs::read_app_config,
             fs::write_app_config,
+            fs::read_app_file,
+            fs::write_app_file,
             fs::path_exists,
             fs::prepare_client_folder,
             fs::list_page_files,

@@ -25,7 +25,12 @@ export function lockAngle(dx: number, dy: number): Point {
 
 /** Rectangle from two corners, in any drag direction. */
 export function boxFromCorners(a: Point, b: Point): Box {
-  return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+  return {
+    x: Math.min(a.x, b.x),
+    y: Math.min(a.y, b.y),
+    w: Math.abs(b.x - a.x),
+    h: Math.abs(b.y - a.y),
+  };
 }
 
 /** Square-up a drag (Shift for a circle): keeps the anchor corner, uses the larger side. */

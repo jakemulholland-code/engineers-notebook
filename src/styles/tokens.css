@@ -23,6 +23,15 @@
   --pink-soft: #ff8fab;
   --pale-blue: #8fb8ff;
   --pale-blue-soft: #c9dcff;
+  --mint-pale: #b5f3e8;
+  --pink-pale: #ffb3c6;
+
+  /* Date pills: border colour plus a 14% wash */
+  --gold-wash: rgba(232, 168, 40, 0.14);
+  --pale-blue-wash: rgba(143, 184, 255, 0.14);
+  --pink-wash: rgba(255, 92, 134, 0.14);
+  --muted-wash: rgba(185, 198, 230, 0.12);
+
   --text: #e9edfd;
   --text-muted: #b9c6e6;
   --tab-idle-text: #c7d0ea;

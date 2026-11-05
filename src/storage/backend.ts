@@ -13,8 +13,16 @@ export interface Backend {
   readAppConfig(): Promise<string | null>;
   writeAppConfig(contents: string): Promise<void>;
   appConfigPath(): Promise<string>;
+  /** Other small app-data files, such as the reminders cache. */
+  readAppFile(name: string): Promise<string | null>;
+  writeAppFile(name: string, contents: string): Promise<void>;
   pathExists(path: string): Promise<boolean>;
-  prepareClientFolder(folder: string, name: string, colour: string, allowForeign: boolean): Promise<PrepareResult>;
+  prepareClientFolder(
+    folder: string,
+    name: string,
+    colour: string,
+    allowForeign: boolean,
+  ): Promise<PrepareResult>;
   listPageFiles(notesPath: string): Promise<string[]>;
   readTextFile(path: string): Promise<string>;
   writeTextAtomic(path: string, contents: string): Promise<void>;
@@ -32,6 +40,8 @@ const tauriBackend: Backend = {
   readAppConfig: () => invoke<string | null>("read_app_config"),
   writeAppConfig: (contents) => invoke("write_app_config", { contents }),
   appConfigPath: () => invoke<string>("app_config_path"),
+  readAppFile: (name) => invoke<string | null>("read_app_file", { name }),
+  writeAppFile: (name, contents) => invoke("write_app_file", { name, contents }),
   pathExists: (path) => invoke<boolean>("path_exists", { path }),
   prepareClientFolder: (folder, name, colour, allowForeign) =>
     invoke<PrepareResult>("prepare_client_folder", { folder, name, colour, allowForeign }),
@@ -52,6 +62,7 @@ const tauriBackend: Backend = {
 function createMemoryBackend(): Backend {
   const files = new Map<string, string>();
   const assets = new Map<string, ArrayBuffer>();
+  const appFiles = new Map<string, string>();
   const dirs = new Set<string>(["C:/Demo/Grade A Technology"]);
   let config: string | null = null;
   return {
@@ -61,6 +72,10 @@ function createMemoryBackend(): Backend {
       config = c;
     },
     appConfigPath: async () => "(browser preview, not saved)",
+    readAppFile: async (name) => appFiles.get(name) ?? null,
+    writeAppFile: async (name, contents) => {
+      appFiles.set(name, contents);
+    },
     pathExists: async (p) => dirs.has(p) || files.has(p),
     prepareClientFolder: async (folder) => {
       const notesPath = `${folder}/notes`;
@@ -105,7 +120,8 @@ function createMemoryBackend(): Backend {
       if (!v) throw new Error(`Asset not found: ${rel}`);
       return v;
     },
-    chooseFolder: async () => window.prompt("Folder path (browser preview)", "C:/Demo/Grade A Technology"),
+    chooseFolder: async () =>
+      window.prompt("Folder path (browser preview)", "C:/Demo/Grade A Technology"),
   };
 }
 

@@ -34,7 +34,11 @@ export function SettingsPanel() {
       <aside className="side-panel" role="dialog" aria-modal="true" aria-label="Settings">
         <header>
           <h2>Settings</h2>
-          <button className="icon-button" aria-label="Close settings" onClick={() => setOpen(false)}>
+          <button
+            className="icon-button"
+            aria-label="Close settings"
+            onClick={() => setOpen(false)}
+          >
             <CloseIcon />
           </button>
         </header>
@@ -78,12 +82,18 @@ function GeneralSection() {
     <>
       <h3>General</h3>
       <p className="lead">App settings are stored in {configPath || "the app data folder"}.</p>
-      <label className="field" style={{ flexDirection: "row", alignItems: "center", gap: 10, color: "var(--text)" }}>
+      <label
+        className="field"
+        style={{ flexDirection: "row", alignItems: "center", gap: 10, color: "var(--text)" }}
+      >
         <input
           type="checkbox"
           checked={general.lockToGrid}
           onChange={(e) =>
-            void updateConfig((c) => ({ ...c, general: { ...c.general, lockToGrid: e.target.checked } }))
+            void updateConfig((c) => ({
+              ...c,
+              general: { ...c.general, lockToGrid: e.target.checked },
+            }))
           }
           style={{ width: 18, height: 18, accentColor: "var(--mint)" }}
         />
@@ -108,7 +118,12 @@ function ClientsSection() {
     if (!folder) return;
     try {
       const r = await backend.prepareClientFolder(folder, t.name, t.colour, false);
-      if (r.status === "foreign" && !window.confirm(`${r.notesPath} already exists and was not made by this app. Add notebook files to it?`)) {
+      if (
+        r.status === "foreign" &&
+        !window.confirm(
+          `${r.notesPath} already exists and was not made by this app. Add notebook files to it?`,
+        )
+      ) {
         return;
       }
       if (r.status === "foreign") await backend.prepareClientFolder(folder, t.name, t.colour, true);
@@ -122,7 +137,8 @@ function ClientsSection() {
     <>
       <h3>Clients and folders</h3>
       <p className="lead">
-        Each tab is tied to a folder. The app keeps its pages in a <code>notes</code> folder inside it.
+        Each tab is tied to a folder. The app keeps its pages in a <code>notes</code> folder inside
+        it.
       </p>
 
       {list.length === 0 && !adding && <p className="lead">No clients yet.</p>}
@@ -141,7 +157,15 @@ function ClientsSection() {
               </span>
             </div>
             <div className="row-actions">
-              <button className="small-button" disabled={missing} onClick={() => void backend.openInExplorer(notesPathFor(t.folder)).catch((e) => setError(String(e)))}>
+              <button
+                className="small-button"
+                disabled={missing}
+                onClick={() =>
+                  void backend
+                    .openInExplorer(notesPathFor(t.folder))
+                    .catch((e) => setError(String(e)))
+                }
+              >
                 Open folder
               </button>
               <button className="small-button" onClick={() => void onChangeFolder(t)}>
@@ -222,7 +246,13 @@ function AddClientForm({ onDone, canCancel }: { onDone: () => void; canCancel: b
       <h3>Add client</h3>
       <label className="field">
         Name
-        <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Grade A Technology" autoFocus />
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Grade A Technology"
+          autoFocus
+        />
       </label>
       <div className="field">
         <span id="colour-label">Colour</span>
@@ -238,7 +268,12 @@ function AddClientForm({ onDone, canCancel }: { onDone: () => void; canCancel: b
               onClick={() => setColour(c.value)}
             />
           ))}
-          <input type="color" aria-label="Custom colour" value={colour} onChange={(e) => setColour(e.target.value)} />
+          <input
+            type="color"
+            aria-label="Custom colour"
+            value={colour}
+            onChange={(e) => setColour(e.target.value)}
+          />
         </div>
       </div>
       <div className="field">
@@ -253,8 +288,9 @@ function AddClientForm({ onDone, canCancel }: { onDone: () => void; canCancel: b
 
       {foreignPath && (
         <div className="form-warning" role="alert">
-          {foreignPath} already exists and was not made by this app. The app will add <code>notebook.json</code>,{" "}
-          <code>pages</code> and <code>assets</code> to it and leave your existing files alone.
+          {foreignPath} already exists and was not made by this app. The app will add{" "}
+          <code>notebook.json</code>, <code>pages</code> and <code>assets</code> to it and leave
+          your existing files alone.
           <div className="form-actions" style={{ marginTop: 10 }}>
             <button type="button" className="small-button" onClick={() => setForeignPath(null)}>
               Choose another folder

@@ -78,6 +78,35 @@ pub fn write_app_config(contents: String) -> Result<(), String> {
     atomic_write(&dir.join("config.json"), contents.as_bytes())
 }
 
+/// Only plain names like `reminders-cache.json` are allowed in the app data folder.
+fn app_file(name: &str) -> Result<PathBuf, String> {
+    let ok = !name.is_empty()
+        && !name.starts_with('.')
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_' || c == '.');
+    if !ok || name == "config.json" {
+        return Err(format!("Invalid app file name: {name}"));
+    }
+    Ok(app_dir()?.join(name))
+}
+
+#[tauri::command]
+pub fn read_app_file(name: String) -> Result<Option<String>, String> {
+    let path = app_file(&name)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    fs::read_to_string(path).map(Some).map_err(err)
+}
+
+#[tauri::command]
+pub fn write_app_file(name: String, contents: String) -> Result<(), String> {
+    let path = app_file(&name)?;
+    fs::create_dir_all(app_dir()?).map_err(err)?;
+    atomic_write(&path, contents.as_bytes())
+}
+
 #[tauri::command]
 pub fn path_exists(path: String) -> bool {
     Path::new(&path).exists()
@@ -274,6 +303,15 @@ mod tests {
         fs::write(&a, "other").unwrap();
         assert!(rename_no_clobber(&a, &b).is_err());
         assert_eq!(fs::read_to_string(&b).unwrap(), "2");
+    }
+
+    #[test]
+    fn app_file_names_are_restricted() {
+        assert!(app_file("reminders-cache.json").is_ok());
+        assert!(app_file("../evil.json").is_err());
+        assert!(app_file("a/b.json").is_err());
+        assert!(app_file(".hidden").is_err());
+        assert!(app_file("config.json").is_err());
     }
 
     #[test]
