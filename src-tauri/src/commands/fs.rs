@@ -107,6 +107,48 @@ pub fn write_app_file(name: String, contents: String) -> Result<(), String> {
     atomic_write(&path, contents.as_bytes())
 }
 
+/// Opens the app data folder (config, caches) in Explorer.
+#[tauri::command]
+pub fn open_app_dir(app: tauri::AppHandle) -> Result<String, String> {
+    use tauri_plugin_opener::OpenerExt;
+    let dir = app_dir()?;
+    fs::create_dir_all(&dir).map_err(err)?;
+    let path = dir.to_string_lossy().to_string();
+    app.opener().open_path(path.clone(), None::<&str>).map_err(err)?;
+    Ok(path)
+}
+
+/// Copies config.json into `folder` as `engineers-notebook-config-<date>.json`
+/// so the setup can move to another PC. Keys are never in it. Never overwrites.
+pub fn backup_config_to(src: &Path, folder: &Path, date: &str) -> Result<PathBuf, String> {
+    if !folder.is_dir() {
+        return Err(format!("Folder not found: {}", folder.display()));
+    }
+    if !date.chars().all(|c| c.is_ascii_digit() || c == '-') {
+        return Err("Invalid date".into());
+    }
+    let text = fs::read_to_string(src).unwrap_or_else(|_| "{}".into());
+    for n in 1..100 {
+        let name = if n == 1 {
+            format!("engineers-notebook-config-{date}.json")
+        } else {
+            format!("engineers-notebook-config-{date}-{n}.json")
+        };
+        let target = folder.join(name);
+        if !target.exists() {
+            atomic_write(&target, text.as_bytes())?;
+            return Ok(target);
+        }
+    }
+    Err("Too many backups for one day in that folder".into())
+}
+
+#[tauri::command]
+pub fn backup_config(folder: String, date: String) -> Result<String, String> {
+    backup_config_to(&app_dir()?.join("config.json"), Path::new(&folder), &date)
+        .map(|p| p.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub fn path_exists(path: String) -> bool {
     Path::new(&path).exists()
@@ -303,6 +345,21 @@ mod tests {
         fs::write(&a, "other").unwrap();
         assert!(rename_no_clobber(&a, &b).is_err());
         assert_eq!(fs::read_to_string(&b).unwrap(), "2");
+    }
+
+    #[test]
+    fn config_backup_never_overwrites() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("config.json");
+        fs::write(&src, "{\"tabs\":[]}").unwrap();
+        let out = dir.path().join("out");
+        fs::create_dir(&out).unwrap();
+        let a = backup_config_to(&src, &out, "2026-11-05").unwrap();
+        let b = backup_config_to(&src, &out, "2026-11-05").unwrap();
+        assert!(a.ends_with("engineers-notebook-config-2026-11-05.json"));
+        assert!(b.ends_with("engineers-notebook-config-2026-11-05-2.json"));
+        assert_eq!(fs::read_to_string(a).unwrap(), "{\"tabs\":[]}");
+        assert!(backup_config_to(&src, &dir.path().join("missing"), "2026-11-05").is_err());
     }
 
     #[test]

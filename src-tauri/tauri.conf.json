@@ -28,6 +28,7 @@
   "bundle": {
     "active": true,
     "targets": ["nsis"],
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -35,5 +36,16 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEQ2QkJFMzQ4NDlBRjJDREYKUldUZkxLOUpTT083MWlxZUpMUFFPTHBvQWFHMGNtZmxBbFQvVTZnSDRHejZPQXd4T29IK1M3cWYK",
+      "endpoints": [
+        "https://github.com/jakemulholland-code/engineers-notebook/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

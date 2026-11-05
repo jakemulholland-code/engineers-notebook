@@ -13,6 +13,32 @@ import { usePersistReminderCache } from "../reminders/useReminders";
 import { RemindersView } from "./RemindersView";
 import { CatchUpPanel } from "../components/CatchUpPanel";
 import { ExportDialog, useExportDialog } from "../components/ExportDialog";
+import { useUpdates } from "./updates";
+
+/** "Version x is ready" with Install and restart, or Later. */
+function UpdatePrompt() {
+  const { state, dismissed, install, dismiss } = useUpdates();
+  if (dismissed || (state.kind !== "available" && state.kind !== "installing")) return null;
+  return (
+    <div className="notice update-notice" role="status">
+      <span>
+        {state.kind === "available"
+          ? `Version ${state.version} of Engineer’s Notebook is ready to install.`
+          : `Installing the update${state.percent !== null ? ` (${state.percent}%)` : ""}. The app will restart.`}
+      </span>
+      {state.kind === "available" && (
+        <>
+          <button className="small-button" onClick={dismiss}>
+            Later
+          </button>
+          <button className="pill primary" onClick={() => void install()}>
+            Install and restart
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 const RING_COUNT = 14;
 
@@ -34,6 +60,12 @@ export function App() {
   }, [init]);
 
   usePersistReminderCache();
+
+  // Check GitHub Releases for a newer version once the notebook is open (installed builds only).
+  useEffect(() => {
+    if (!ready || import.meta.env.DEV) return;
+    if (useNotebook.getState().config.general.checkForUpdates) void useUpdates.getState().check();
+  }, [ready]);
 
   // Save anything pending before the window closes.
   useEffect(() => {
@@ -96,6 +128,7 @@ export function App() {
       <StatusBar />
       <SettingsPanel />
       <ExportDialog />
+      <UpdatePrompt />
       {notice && (
         <div className="notice" role="status">
           <span>{notice}</span>

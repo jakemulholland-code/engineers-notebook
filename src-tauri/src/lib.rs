@@ -4,7 +4,31 @@ use commands::{ai, assets, export, fs, keychain};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        use tauri::Manager;
+        builder = builder
+            // Must be registered first: a second launch focuses the open window instead.
+            .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.unminimize();
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }))
+            // Remembers window size, position and maximised state.
+            .plugin(tauri_plugin_window_state::Builder::default().build())
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_process::init())
+            .plugin(tauri_plugin_autostart::init(
+                tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+                None,
+            ));
+    }
+
+    builder
         .manage(ai::AiState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
@@ -21,6 +45,8 @@ pub fn run() {
             fs::write_text_atomic,
             fs::rename_file,
             fs::open_in_explorer,
+            fs::open_app_dir,
+            fs::backup_config,
             assets::save_asset,
             assets::read_asset,
             keychain::key_status,

@@ -6,6 +6,7 @@ import { useNotebook, visibleTabs } from "../store/notebook";
 import { CloseIcon } from "./Icons";
 import { AiSection } from "./AiSettings";
 import { ExportSection } from "./ExportSettings";
+import { GeneralSection } from "./GeneralSettings";
 
 type Section = "clients" | "ai" | "export" | "general";
 const SECTIONS: { id: Section; label: string }[] = [
@@ -60,38 +61,6 @@ export function SettingsPanel() {
           </div>
         </div>
       </aside>
-    </>
-  );
-}
-
-function GeneralSection() {
-  const general = useNotebook((s) => s.config.general);
-  const updateConfig = useNotebook((s) => s.updateConfig);
-  const [configPath, setConfigPath] = useState("");
-  useEffect(() => {
-    void backend.appConfigPath().then(setConfigPath);
-  }, []);
-  return (
-    <>
-      <h3>General</h3>
-      <p className="lead">App settings are stored in {configPath || "the app data folder"}.</p>
-      <label
-        className="field"
-        style={{ flexDirection: "row", alignItems: "center", gap: 10, color: "var(--text)" }}
-      >
-        <input
-          type="checkbox"
-          checked={general.lockToGrid}
-          onChange={(e) =>
-            void updateConfig((c) => ({
-              ...c,
-              general: { ...c.general, lockToGrid: e.target.checked },
-            }))
-          }
-          style={{ width: 18, height: 18, accentColor: "var(--mint)" }}
-        />
-        Lock to grid by default
-      </label>
     </>
   );
 }

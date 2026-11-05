@@ -13,7 +13,7 @@ Built with Tauri 2, React 18, TypeScript and Konva. See [SPEC.md](SPEC.md) for t
 | M3 Dates and Reminders | Done |
 | M4 AI | Done (tested against a local mock of each API; check each real provider with your own key) |
 | M5 Export | Done |
-| M6 Release | Not started |
+| M6 Release | In progress |
 
 ## Prerequisites
 
@@ -129,10 +129,36 @@ Each client folder gets a `notes` folder:
 
 Pages save 800 ms after the last change, as an atomic write (temp file, then rename), keeping one `.bak` of the previous version. App settings live in `%APPDATA%\engineers-notebook\config.json`. API keys will go in Windows Credential Manager, never in a file.
 
-## Build an installer
+## Install
+
+Download `Engineers.Notebook_<version>_x64-setup.exe` from the [latest release](https://github.com/jakemulholland-code/engineers-notebook/releases/latest) and run it. Windows SmartScreen warns because the installer is not code-signed: choose **More info**, then **Run anyway**. Then open the app from the Start menu, right-click its taskbar icon and choose **Pin to taskbar**.
+
+The app checks for new versions when it opens (Settings › General › Check for updates on launch) and offers **Install and restart**.
+
+## Releasing a new version
+
+1. Bump `version` in `package.json`, `src-tauri/tauri.conf.json` and `src-tauri/Cargo.toml`.
+2. Commit, then tag and push:
+
+```bash
+git tag v0.1.1
+```
+
+```bash
+git push origin main --tags
+```
+
+3. The `release` workflow builds the installer on `windows-latest`, signs the updater files and attaches everything, including `latest.json`, to a **draft** release.
+4. Check the draft, then publish it. Installed apps only see published releases.
+
+### Updater signing key
+
+Updates are signed. The private key and its password were generated on Jake's machine at `%USERPROFILE%\.tauri\engineers-notebook.key` (password in `engineers-notebook.key.password.txt` beside it) and stored as the repo secrets `TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Keep a copy of both in a password manager: if the key is lost, installed copies can no longer be updated and everyone has to reinstall by hand. The public key is in `src-tauri/tauri.conf.json`.
+
+To build an installer locally without releasing:
 
 ```bash
 npm run tauri build
 ```
 
-The NSIS installer lands in `src-tauri/target/release/bundle/nsis/`. Release automation through GitHub Actions comes in milestone 6.
+The installer lands in `src-tauri/target/release/bundle/nsis/`.

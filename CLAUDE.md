@@ -32,4 +32,6 @@ Copied from the last section of [SPEC.md](SPEC.md).
 - Export writes only through the Rust `export_*` commands, which create a fresh `notebook-export-<date>` folder, refuse paths that leave it and never overwrite. PDF header text uses the standard Helvetica font, so characters outside Windows-1252 become "?" (`safeText`).
 - AI page snapshots (up to 5 recently edited pages) use the same renderer, and are sent only when the cached model list says the chosen model accepts images.
 - Gotcha: Chromium's `scrollIntoView` now returns a Promise, so never write `useEffect(() => el.scrollIntoView())` as a one-liner; React treats the Promise as a cleanup function and crashes. An error boundary in `main.tsx` now shows a Reload screen instead of a blank window.
+- Releases: repo `jakemulholland-code/engineers-notebook` (public). Tags `v*` run `.github/workflows/release.yml` (tauri-action v1, NSIS only, draft release with `latest.json`). The updater reads `releases/latest/download/latest.json`, so only published releases are offered. Never commit the signing key; it lives outside the repo and in repo secrets.
+- Desktop plugins: single instance (registered first), window state, updater, process (relaunch), autostart.
 - React is pinned to 18 (as specced) with `react-konva` 18. TypeScript is pinned to 5.9 for tooling compatibility.

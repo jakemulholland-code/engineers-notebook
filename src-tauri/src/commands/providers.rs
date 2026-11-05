@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 
 pub const ANTHROPIC_VERSION: &str = "2026-10-21";
 pub const APP_TITLE: &str = "Engineer's Notebook";
-pub const APP_REFERER: &str = "https://engineers-notebook.local";
+pub const APP_REFERER: &str = "https://github.com/jakemulholland-code/engineers-notebook";
 
 #[derive(Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
