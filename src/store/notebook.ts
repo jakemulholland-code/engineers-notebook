@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { defaultConfig, parseConfig, type AppConfig, type TabConfig } from "../model/config";
-import { createPage, newId, pageFileName, uniquePageFileName, type Page } from "../model/page";
+import { createPage, newId, pageFileName, uniquePageFileName, type Element, type Page } from "../model/page";
+import { emptyHistory, record, redo as redoStep, undo as undoStep, type History } from "../canvas/history";
 import { backend } from "../storage/backend";
 import { loadTab, savePage, type LoadedPage } from "../storage/notebook";
 import { pagePath } from "../storage/paths";
@@ -43,8 +44,23 @@ type NotebookStore = {
   newPage(): Promise<void>;
   goToPage(delta: number): void;
   updatePage(mutate: (p: Page) => Page): void;
+  /** Changes the current page's elements as one undoable step. */
+  editElements(mutate: (els: Element[]) => Element[]): void;
+  undo(): void;
+  redo(): void;
+  /** Bumped whenever undo/redo availability may have changed. */
+  historyTick: number;
   flushSaves(): Promise<void>;
 };
+
+const histories = new Map<string, History<Element[]>>();
+
+export function historyFor(pageId: string | undefined): { canUndo: boolean; canRedo: boolean } {
+  const h = pageId ? histories.get(pageId) : undefined;
+  return { canUndo: !!h && h.past.length > 0, canRedo: !!h && h.future.length > 0 };
+}
+
+const sameElements = (a: Element[], b: Element[]) => a.length === b.length && a.every((el, i) => el === b[i]);
 
 export const visibleTabs = (c: AppConfig): TabConfig[] =>
   c.tabs.filter((t) => !t.archived).sort((a, b) => a.order - b.order);
@@ -269,6 +285,42 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       set({ save: { kind: "unsaved" } });
       const { tabId } = cur;
       scheduleSave(`${tabId}:${updated.id}`, () => savePageNow(tabId, updated.id));
+    },
+
+    historyTick: 0,
+
+    editElements(mutate) {
+      const cur = currentPageOf(get());
+      if (!cur || cur.loaded.readOnly) return;
+      const before = cur.loaded.page.elements;
+      const after = mutate(before);
+      if (sameElements(before, after)) return;
+      const id = cur.loaded.page.id;
+      histories.set(id, record(histories.get(id) ?? emptyHistory(), before));
+      get().updatePage((p) => ({ ...p, elements: after }));
+      set((s) => ({ historyTick: s.historyTick + 1 }));
+    },
+
+    undo() {
+      const cur = currentPageOf(get());
+      if (!cur || cur.loaded.readOnly) return;
+      const id = cur.loaded.page.id;
+      const step = undoStep(histories.get(id) ?? emptyHistory<Element[]>(), cur.loaded.page.elements);
+      if (!step) return;
+      histories.set(id, step.history);
+      get().updatePage((p) => ({ ...p, elements: step.value }));
+      set((s) => ({ historyTick: s.historyTick + 1 }));
+    },
+
+    redo() {
+      const cur = currentPageOf(get());
+      if (!cur || cur.loaded.readOnly) return;
+      const id = cur.loaded.page.id;
+      const step = redoStep(histories.get(id) ?? emptyHistory<Element[]>(), cur.loaded.page.elements);
+      if (!step) return;
+      histories.set(id, step.history);
+      get().updatePage((p) => ({ ...p, elements: step.value }));
+      set((s) => ({ historyTick: s.historyTick + 1 }));
     },
 
     async flushSaves() {

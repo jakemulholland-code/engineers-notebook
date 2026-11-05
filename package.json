@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
     "e2e:m1": "node scripts/e2e-m1.mjs",
+    "e2e:m2": "node scripts/e2e-m2.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

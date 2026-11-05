@@ -9,7 +9,7 @@ Built with Tauri 2, React 18, TypeScript and Konva. See [SPEC.md](SPEC.md) for t
 | Milestone | State |
 | --- | --- |
 | M1 Shell and storage | Done |
-| M2 Canvas tools | Not started |
+| M2 Canvas tools | Done |
 | M3 Dates and Reminders | Not started |
 | M4 AI | Not started |
 | M5 Export | Not started |
@@ -43,9 +43,9 @@ npm test
 npm run test:rust
 ```
 
-### End-to-end check (M1)
+### End-to-end checks
 
-Runs against the real app using scratch folders under `test-fixtures/_scratch` (git-ignored). In PowerShell:
+`e2e:m1` covers storage and `e2e:m2` covers every canvas tool, paste and drop, undo and redo, and pan and zoom timing on a 500-stroke page. They run against the real app using scratch folders under `test-fixtures/_scratch` (git-ignored). In PowerShell:
 
 ```powershell
 $env:ENGINEERS_NOTEBOOK_APP_DIR = "$PWD\test-fixtures\_scratch\appdata"
@@ -57,6 +57,10 @@ Then in a second terminal:
 
 ```bash
 npm run e2e:m1
+```
+
+```bash
+npm run e2e:m2
 ```
 
 `ENGINEERS_NOTEBOOK_APP_DIR` points the app at a different config folder than `%APPDATA%\engineers-notebook`. Use it for any dev run so your real setup is left alone.

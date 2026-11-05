@@ -149,7 +149,7 @@ function MainView() {
         <PaperStage
           page={cur.loaded.page}
           readOnly={cur.loaded.readOnly}
-          gridSize={config.general.gridSize}
+          notesPath={tabState.notesPath}
           onTitleChange={(title) => updatePage((p) => ({ ...p, title }))}
         />
       );

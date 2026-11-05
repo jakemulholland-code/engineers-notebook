@@ -21,4 +21,6 @@ Copied from the last section of [SPEC.md](SPEC.md).
 
 - Dev runs: set `ENGINEERS_NOTEBOOK_APP_DIR` to a folder under `test-fixtures/_scratch` so the real `%APPDATA%` config is untouched.
 - `npm run dev` (browser only) uses an in-memory backend in `src/storage/backend.ts`; the real app goes through the Rust commands in `src-tauri/src/commands/fs.rs`.
+- Stroke `points` are flat `[x, y, pressure, ...]` triples relative to the element's `x`/`y` (the first point). Pressure 0.5 everywhere means a mouse, and perfect-freehand simulates pressure.
+- Canvas performance rules (measured on a 3x-density screen with 500 strokes): keep Konva to two layers, cap `Konva.pixelRatio` at 2, never put pan/zoom in React state (`PaperStage` applies it to the stage and to CSS variables `--pan-x`, `--pan-y`, `--zoom`), keep the element node list memoised, and draw from a cached bitmap during wheel zoom.
 - React is pinned to 18 (as specced) with `react-konva` 18. TypeScript is pinned to 5.9 for tooling compatibility.

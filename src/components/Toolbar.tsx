@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { INK_COLOURS, STROKE_WIDTHS } from "../model/config";
-import { useNotebook } from "../store/notebook";
+import { restyle } from "../canvas/elements";
+import { currentPageOf, historyFor, useNotebook } from "../store/notebook";
 import { useTools, type ToolId } from "../store/tools";
 import {
   ArrowIcon,
@@ -44,8 +45,22 @@ export function Toolbar() {
   const updateConfig = useNotebook((s) => s.updateConfig);
   const openSettings = useNotebook((s) => s.setSettingsOpen);
 
-  const setGeneral = (patch: Partial<typeof general>) =>
+  const undo = useNotebook((s) => s.undo);
+  const redo = useNotebook((s) => s.redo);
+  const editElements = useNotebook((s) => s.editElements);
+  useNotebook((s) => s.historyTick); // re-render when undo/redo availability changes
+  const pageId = useNotebook((s) => currentPageOf(s)?.loaded.page.id);
+  const history = historyFor(pageId);
+
+  const setGeneral = (patch: Partial<typeof general>) => {
     void updateConfig((c) => ({ ...c, general: { ...c.general, ...patch } }));
+    // Colour and width also restyle the current selection.
+    const sel = new Set(useTools.getState().selectedIds);
+    const style = { colour: patch.inkColour, width: patch.strokeWidth };
+    if (sel.size && (style.colour || style.width)) {
+      editElements((els) => els.map((el) => (sel.has(el.id) ? restyle(el, style) : el)));
+    }
+  };
 
   return (
     <header className="toolbar">
@@ -110,10 +125,10 @@ export function Toolbar() {
       </label>
 
       <div className="toolbar-end">
-        <button className="icon-button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled>
+        <button className="icon-button" aria-label="Undo" title="Undo (Ctrl+Z)" disabled={!history.canUndo} onClick={undo}>
           <UndoIcon />
         </button>
-        <button className="icon-button" aria-label="Redo" title="Redo (Ctrl+Y)" disabled>
+        <button className="icon-button" aria-label="Redo" title="Redo (Ctrl+Y)" disabled={!history.canRedo} onClick={redo}>
           <RedoIcon />
         </button>
         <button className="pill primary" disabled title="AI catch-up arrives in milestone 4">

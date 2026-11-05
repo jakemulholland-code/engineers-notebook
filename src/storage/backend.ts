@@ -21,6 +21,9 @@ export interface Backend {
   /** Renames a file; fails if the target exists. */
   renameFile(from: string, to: string): Promise<void>;
   openInExplorer(path: string): Promise<void>;
+  /** Saves PNG bytes (base64) into `<notes>/assets`, de-duplicated; returns `assets/<sha256>.png`. */
+  saveAsset(notesPath: string, pngBase64: string): Promise<string>;
+  readAsset(notesPath: string, rel: string): Promise<ArrayBuffer>;
   chooseFolder(title: string): Promise<string | null>;
 }
 
@@ -37,6 +40,8 @@ const tauriBackend: Backend = {
   writeTextAtomic: (path, contents) => invoke("write_text_atomic", { path, contents }),
   renameFile: (from, to) => invoke("rename_file", { from, to }),
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
+  saveAsset: (notesPath, dataBase64) => invoke<string>("save_asset", { notesPath, dataBase64 }),
+  readAsset: (notesPath, rel) => invoke<ArrayBuffer>("read_asset", { notesPath, rel }),
   chooseFolder: async (title) => {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ directory: true, multiple: false, title });
@@ -46,6 +51,7 @@ const tauriBackend: Backend = {
 
 function createMemoryBackend(): Backend {
   const files = new Map<string, string>();
+  const assets = new Map<string, ArrayBuffer>();
   const dirs = new Set<string>(["C:/Demo/Grade A Technology"]);
   let config: string | null = null;
   return {
@@ -86,6 +92,19 @@ function createMemoryBackend(): Backend {
       files.set(to, v);
     },
     openInExplorer: async () => undefined,
+    saveAsset: async (notesPath, b64) => {
+      const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+      const digest = await crypto.subtle.digest("SHA-256", bytes);
+      const hex = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      const rel = `assets/${hex}.png`;
+      assets.set(`${notesPath}/${rel}`, bytes.buffer);
+      return rel;
+    },
+    readAsset: async (notesPath, rel) => {
+      const v = assets.get(`${notesPath}/${rel}`);
+      if (!v) throw new Error(`Asset not found: ${rel}`);
+      return v;
+    },
     chooseFolder: async () => window.prompt("Folder path (browser preview)", "C:/Demo/Grade A Technology"),
   };
 }

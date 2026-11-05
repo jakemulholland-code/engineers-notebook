@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::fs;
+use commands::{assets, fs};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -18,6 +18,8 @@ pub fn run() {
             fs::write_text_atomic,
             fs::rename_file,
             fs::open_in_explorer,
+            assets::save_asset,
+            assets::read_asset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Engineer's Notebook");
