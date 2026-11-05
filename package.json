@@ -15,6 +15,7 @@
     "e2e:m2": "node scripts/e2e-m2.mjs",
     "e2e:m3": "node scripts/e2e-m3.mjs",
     "e2e:m4": "node scripts/e2e-m4.mjs",
+    "e2e:m5": "node scripts/e2e-m5.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

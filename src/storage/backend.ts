@@ -32,6 +32,11 @@ export interface Backend {
   /** Saves PNG bytes (base64) into `<notes>/assets`, de-duplicated; returns `assets/<sha256>.png`. */
   saveAsset(notesPath: string, pngBase64: string): Promise<string>;
   readAsset(notesPath: string, rel: string): Promise<ArrayBuffer>;
+  /** Export: a fresh `notebook-export-<date>` folder in `dest`, then files inside it only. */
+  exportPrepareDir(dest: string, date: string): Promise<string>;
+  exportWrite(root: string, rel: string, base64: string): Promise<void>;
+  exportWriteText(root: string, rel: string, text: string): Promise<void>;
+  exportCopyAsset(notesPath: string, asset: string, root: string, rel: string): Promise<void>;
   /** API keys: saved to the OS credential store. Only the last four characters ever come back. */
   keyStatus(provider: string): Promise<string | null>;
   saveKey(provider: string, key: string): Promise<string>;
@@ -56,6 +61,11 @@ const tauriBackend: Backend = {
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
   saveAsset: (notesPath, dataBase64) => invoke<string>("save_asset", { notesPath, dataBase64 }),
   readAsset: (notesPath, rel) => invoke<ArrayBuffer>("read_asset", { notesPath, rel }),
+  exportPrepareDir: (dest, date) => invoke<string>("export_prepare_dir", { dest, date }),
+  exportWrite: (root, rel, dataBase64) => invoke("export_write", { root, rel, dataBase64 }),
+  exportWriteText: (root, rel, text) => invoke("export_write_text", { root, rel, text }),
+  exportCopyAsset: (notesPath, asset, root, rel) =>
+    invoke("export_copy_asset", { notesPath, asset, root, rel }),
   keyStatus: (provider) => invoke<string | null>("key_status", { provider }),
   saveKey: (provider, key) => invoke<string>("save_key", { provider, key }),
   removeKey: (provider) => invoke("remove_key", { provider }),
@@ -122,6 +132,21 @@ function createMemoryBackend(): Backend {
       const rel = `assets/${hex}.png`;
       assets.set(`${notesPath}/${rel}`, bytes.buffer);
       return rel;
+    },
+    exportPrepareDir: async (dest, date) => {
+      const root = `${dest}/notebook-export-${date}`;
+      dirs.add(root);
+      return root;
+    },
+    exportWrite: async (root, rel, b64) => {
+      files.set(`${root}/${rel}`, `(binary, ${Math.round((b64.length * 3) / 4)} bytes)`);
+    },
+    exportWriteText: async (root, rel, text) => {
+      files.set(`${root}/${rel}`, text);
+    },
+    exportCopyAsset: async (notesPath, asset, root, rel) => {
+      const v = assets.get(`${notesPath}/${asset}`);
+      if (v) assets.set(`${root}/${rel}`, v);
     },
     // Browser preview only: keeps the last four characters, never the key.
     keyStatus: async (p) => keys.get(p) ?? null,

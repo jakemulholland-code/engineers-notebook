@@ -45,6 +45,30 @@
   --tab-idle: rgba(233, 237, 253, 0.07);
   --shadow-popover: 0 18px 40px rgba(4, 8, 24, 0.55);
 
+  /* Printer-friendly export: white paper, light blue grid, dark ink.
+     Each screen colour has a print stand-in with the same name after --print. */
+  --print-paper: #ffffff;
+  --print-paper-margin: #ffffff;
+  --print-grid-minor: rgba(47, 111, 208, 0.13);
+  --print-grid-major: rgba(47, 111, 208, 0.32);
+  --print-ink-white: #1b2340;
+  --print-mint: #00806b;
+  --print-mint-soft: #00806b;
+  --print-gold: #a86a00;
+  --print-gold-soft: #8a5600;
+  --print-pink: #c2185b;
+  --print-pink-pale: #a0144a;
+  --print-pale-blue: #2f6fd0;
+  --print-pale-blue-soft: #1f57b0;
+  --print-text: #1b2340;
+  --print-text-muted: #5b6688;
+  --print-line-strong: rgba(27, 35, 64, 0.3);
+  --print-gold-wash: rgba(232, 168, 40, 0.15);
+  --print-pale-blue-wash: rgba(47, 111, 208, 0.1);
+  --print-pink-wash: rgba(194, 24, 91, 0.1);
+  --print-muted-wash: rgba(91, 102, 136, 0.1);
+  --print-desk: #ffffff;
+
   /* Type */
   --font-display: "Bricolage Grotesque", "Satoshi", sans-serif;
   --font-body: "Satoshi", "Helvetica Neue", Arial, sans-serif;

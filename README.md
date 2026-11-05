@@ -12,7 +12,7 @@ Built with Tauri 2, React 18, TypeScript and Konva. See [SPEC.md](SPEC.md) for t
 | M2 Canvas tools | Done |
 | M3 Dates and Reminders | Done |
 | M4 AI | Done (tested against a local mock of each API; check each real provider with your own key) |
-| M5 Export | Not started |
+| M5 Export | Done |
 | M6 Release | Not started |
 
 ## Prerequisites
@@ -78,6 +78,29 @@ npm run tauri dev *> test-fixtures\_scratch\app.log
 ```bash
 npm run e2e:m4
 ```
+
+`e2e:m5` covers export (every scope and format, PDF page sizes and contents pages, a pixel comparison between the exported page and the live canvas, printer-friendly colours) and AI page snapshots. Start the app as for `e2e:m4`, then:
+
+```bash
+npm run e2e:m5
+```
+
+## Export
+
+Export (toolbar button or Ctrl+Shift+E) writes Markdown, PDF or both for all tabs, one tab or the current page into a new `notebook-export-<date>` folder in the chosen destination (`-2`, `-3` and so on if one already exists, so nothing is overwritten):
+
+```
+notebook-export-2026-11-05/
+  Grade A Technology/
+    2026-10-28-faceted-navigation-audit.md
+    2026-10-28-faceted-navigation-audit.pdf
+    Grade A Technology - all pages.pdf      (tab and all-tabs exports: contents page first)
+    assets/
+  Reminders.md
+  Reminders.pdf
+```
+
+Pages are drawn by the same components as the live canvas, at 2x, on landscape A4. Printer friendly swaps to white paper, a light blue grid and dark ink. Defaults live in Settings › Export.
 
 ## AI providers
 

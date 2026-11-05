@@ -5,6 +5,7 @@ import { notesPathFor } from "../storage/paths";
 import { useNotebook, visibleTabs } from "../store/notebook";
 import { CloseIcon } from "./Icons";
 import { AiSection } from "./AiSettings";
+import { ExportSection } from "./ExportSettings";
 
 type Section = "clients" | "ai" | "export" | "general";
 const SECTIONS: { id: Section; label: string }[] = [
@@ -54,20 +55,11 @@ export function SettingsPanel() {
           <div className="settings-section">
             {section === "clients" && <ClientsSection />}
             {section === "ai" && <AiSection />}
-            {section === "export" && <ComingLater title="Export" milestone="milestone 5" />}
+            {section === "export" && <ExportSection />}
             {section === "general" && <GeneralSection />}
           </div>
         </div>
       </aside>
-    </>
-  );
-}
-
-function ComingLater({ title, milestone }: { title: string; milestone: string }) {
-  return (
-    <>
-      <h3>{title}</h3>
-      <p className="lead">These settings arrive in {milestone}.</p>
     </>
   );
 }

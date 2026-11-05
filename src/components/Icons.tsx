@@ -131,6 +131,12 @@ export const ChevronRightIcon = (p: IconProps) => (
     <path d="M7.5 4l6 6-6 6" />
   </Svg>
 );
+export const ExportIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M10 3v9M6.5 8.5L10 12l3.5-3.5" />
+    <path d="M4 13.5V16h12v-2.5" />
+  </Svg>
+);
 export const FolderIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M2.5 5.5a1.5 1.5 0 011.5-1.5h4l2 2h6a1.5 1.5 0 011.5 1.5v7a1.5 1.5 0 01-1.5 1.5H4a1.5 1.5 0 01-1.5-1.5z" />

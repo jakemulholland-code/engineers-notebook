@@ -10,7 +10,7 @@ use super::fs::atomic_write;
 const PNG_MAGIC: &[u8] = b"\x89PNG\r\n\x1a\n";
 
 /// Resolves `assets/<name>` inside a notes folder, rejecting anything that could escape it.
-fn asset_path(notes: &Path, rel: &str) -> Result<PathBuf, String> {
+pub fn asset_path(notes: &Path, rel: &str) -> Result<PathBuf, String> {
     let name = rel
         .strip_prefix("assets/")
         .ok_or("Asset path must start with assets/")?;

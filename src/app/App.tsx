@@ -12,6 +12,7 @@ import { TOOL_KEYS, useTools } from "../store/tools";
 import { usePersistReminderCache } from "../reminders/useReminders";
 import { RemindersView } from "./RemindersView";
 import { CatchUpPanel } from "../components/CatchUpPanel";
+import { ExportDialog, useExportDialog } from "../components/ExportDialog";
 
 const RING_COUNT = 14;
 
@@ -56,7 +57,20 @@ export function App() {
         s.setSettingsOpen(!s.settingsOpen);
         return;
       }
-      if (isTyping(e.target) || e.ctrlKey || e.altKey || e.metaKey || s.settingsOpen) return;
+      if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        useExportDialog.getState().setOpen(true);
+        return;
+      }
+      if (
+        isTyping(e.target) ||
+        e.ctrlKey ||
+        e.altKey ||
+        e.metaKey ||
+        s.settingsOpen ||
+        useExportDialog.getState().open
+      )
+        return;
       const key = e.key.toLowerCase();
       if (key === "g") {
         void s.updateConfig((c) => ({
@@ -81,6 +95,7 @@ export function App() {
       </main>
       <StatusBar />
       <SettingsPanel />
+      <ExportDialog />
       {notice && (
         <div className="notice" role="status">
           <span>{notice}</span>

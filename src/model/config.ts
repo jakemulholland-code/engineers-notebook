@@ -45,6 +45,15 @@ const AiSettingsSchema = z.object({
   temperature: z.number().min(0).max(2).default(0.3),
 });
 
+/** Export defaults (SPEC: Settings, Export). An empty destination means Documents. */
+const ExportSettingsSchema = z.object({
+  format: z.enum(["markdown", "pdf", "both"]).default("both"),
+  destination: z.string().default(""),
+  includeImages: z.boolean().default(true),
+  includeDone: z.boolean().default(true),
+  printerFriendly: z.boolean().default(false),
+});
+
 export const AppConfigSchema = z.object({
   schemaVersion: z.literal(1).default(1),
   tabs: z.array(TabConfigSchema).default([]),
@@ -67,7 +76,10 @@ export const AppConfigSchema = z.object({
       checkForUpdates: true,
     }),
   ai: AiSettingsSchema.default(AiSettingsSchema.parse({})),
+  export: ExportSettingsSchema.default(ExportSettingsSchema.parse({})),
 });
+
+export type ExportSettings = z.infer<typeof ExportSettingsSchema>;
 
 export type AiSettings = z.infer<typeof AiSettingsSchema>;
 

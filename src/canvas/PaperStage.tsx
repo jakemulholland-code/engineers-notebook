@@ -9,7 +9,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
-import { Group, Layer, Rect, Shape, Stage, Transformer } from "react-konva";
+import { Group, Layer, Rect, Stage, Transformer } from "react-konva";
 import { PAGE_HEIGHT, PAGE_WIDTH, type Element, type Page } from "../model/page";
 import { useNotebook } from "../store/notebook";
 import { MAX_ZOOM, MIN_ZOOM, useTools } from "../store/tools";
@@ -29,14 +29,14 @@ import {
 } from "./elements";
 import { boxFromCorners, lockAngle, snap, snapPoint, squareCorner, type Point } from "./geometry";
 import { TextEditor } from "./TextEditor";
+import { PaperBackground, TITLE_X, TITLE_Y, drawOrder } from "./PageScene";
 import { ContextMenu, type MenuItem } from "../components/ContextMenu";
 import { DatePopover } from "../components/DatePopover";
+import { useExportDialog } from "../components/ExportDialog";
 import { useToday } from "../reminders/useReminders";
 import type { DateTag } from "../model/page";
 import { ToolOptions } from "./ToolOptions";
 
-const TITLE_X = 60;
-const TITLE_Y = 40;
 const PAN_MARGIN = 200;
 const ERASER_RADIUS = 6;
 
@@ -62,8 +62,6 @@ type Props = {
 const isTyping = (t: EventTarget | null) =>
   t instanceof HTMLElement &&
   (t.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(t.tagName));
-
-const isBrush = (el: Element) => el.type === "stroke" && el.tool === "brush";
 
 export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -868,7 +866,12 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
         applyView(0, 0, 1);
         return;
       }
-      if (isTyping(e.target) || useNotebook.getState().settingsOpen) return;
+      if (
+        isTyping(e.target) ||
+        useNotebook.getState().settingsOpen ||
+        useExportDialog.getState().open
+      )
+        return;
       if (e.code === "Space") {
         e.preventDefault();
         setSpaceDown(true);
@@ -932,10 +935,7 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
 
   // ---------- render ----------
 
-  const ordered = useMemo(
-    () => [...page.elements.filter(isBrush), ...page.elements.filter((el) => !isBrush(el))],
-    [page.elements],
-  );
+  const ordered = useMemo(() => drawOrder(page.elements), [page.elements]);
 
   const draftElement: Element | null = useMemo(() => {
     if (!draft) return null;
@@ -1043,39 +1043,7 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
         {/* Two layers only: each layer is a full-size canvas the browser composites every frame. */}
         <Layer ref={layerRef} listening={interactive}>
           <Group ref={contentRef}>
-            <Rect
-              x={0}
-              y={0}
-              width={PAGE_WIDTH}
-              height={PAGE_HEIGHT}
-              fill={colours.paper}
-              listening={false}
-            />
-            <Shape
-              listening={false}
-              perfectDrawEnabled={false}
-              sceneFunc={(ctx) => {
-                const c = ctx._context;
-                c.lineWidth = 1;
-                const draw = (step: number, colour: string, skip?: number) => {
-                  c.beginPath();
-                  c.strokeStyle = colour;
-                  for (let x = 0; x <= PAGE_WIDTH; x += step) {
-                    if (skip && x % skip === 0) continue;
-                    c.moveTo(x + 0.5, 0);
-                    c.lineTo(x + 0.5, PAGE_HEIGHT);
-                  }
-                  for (let y = 0; y <= PAGE_HEIGHT; y += step) {
-                    if (skip && y % skip === 0) continue;
-                    c.moveTo(0, y + 0.5);
-                    c.lineTo(PAGE_WIDTH, y + 0.5);
-                  }
-                  c.stroke();
-                };
-                draw(grid, colours.minor, grid * 5);
-                draw(grid * 5, colours.major);
-              }}
-            />
+            <PaperBackground grid={grid} />
             {elementNodes}
           </Group>
         </Layer>

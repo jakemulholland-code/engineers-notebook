@@ -5,17 +5,10 @@ import type { DateTag, Element } from "../model/page";
 import { fromYmd, isOverdue, pillLabel } from "../reminders/dates";
 import { useAsset } from "./assets";
 import { TEXT_STYLE, strokePath } from "./elements";
+import { cssVar, screenTheme, useCanvasTheme, type CanvasTheme } from "./theme";
 
 /** Reads a design token (CSS variable) so canvas colours match the chrome. */
-const tokenCache = new Map<string, string>();
-export function token(name: string): string {
-  let v = tokenCache.get(name);
-  if (v === undefined) {
-    v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    tokenCache.set(name, v);
-  }
-  return v;
-}
+export const token = cssVar;
 
 export const FONT_BODY = "Satoshi, 'Helvetica Neue', Arial, sans-serif";
 export const FONT_DISPLAY = "'Bricolage Grotesque', Satoshi, sans-serif";
@@ -140,20 +133,33 @@ export function pillAnchor(el: Element): { x: number; y: number } {
 export function pillColours(
   tag: DateTag,
   today: Date,
+  t: CanvasTheme = screenTheme,
 ): { stroke: string; fill: string; text: string } {
   if (tag.done)
-    return { stroke: token("--line-strong"), fill: "transparent", text: token("--text-muted") };
+    return { stroke: t.token("--line-strong"), fill: "transparent", text: t.token("--text-muted") };
   if (isOverdue(tag, today))
-    return { stroke: token("--pink"), fill: token("--pink-wash"), text: token("--pink-pale") };
+    return {
+      stroke: t.token("--pink"),
+      fill: t.token("--pink-wash"),
+      text: t.token("--pink-pale"),
+    };
   if (tag.kind === "due")
-    return { stroke: token("--gold"), fill: token("--gold-wash"), text: token("--gold-soft") };
+    return {
+      stroke: t.token("--gold"),
+      fill: t.token("--gold-wash"),
+      text: t.token("--gold-soft"),
+    };
   if (tag.kind === "follow_up")
     return {
-      stroke: token("--pale-blue"),
-      fill: token("--pale-blue-wash"),
-      text: token("--pale-blue-soft"),
+      stroke: t.token("--pale-blue"),
+      fill: t.token("--pale-blue-wash"),
+      text: t.token("--pale-blue-soft"),
     };
-  return { stroke: token("--text-muted"), fill: token("--muted-wash"), text: token("--text") };
+  return {
+    stroke: t.token("--text-muted"),
+    fill: t.token("--muted-wash"),
+    text: t.token("--text"),
+  };
 }
 
 type PillProps = {
@@ -169,7 +175,8 @@ function Pill({ tag, today, x, y, onClick }: PillProps) {
   const label = pillLabel(tag, todayDate);
   const font: Font = { fontSize: PILL_FONT, fontStyle: "bold", lineHeight: 1 };
   const w = 30 + measureTextWidth(label, font) + 12;
-  const c = pillColours(tag, todayDate);
+  const theme = useCanvasTheme();
+  const c = pillColours(tag, todayDate, theme);
   const handle = (e: Konva.KonvaEventObject<Event>) => {
     e.cancelBubble = true;
     onClick?.();
@@ -259,12 +266,13 @@ function ElementNodeImpl(p: Props) {
 export const ElementNode = memo(ElementNodeImpl);
 
 function Body({ el, notesPath, today, onToggleItem, onPillClick }: Props) {
+  const t = useCanvasTheme();
   switch (el.type) {
     case "stroke":
       return (
         <Path
           data={strokePath(el)}
-          fill={el.colour}
+          fill={t.ink(el.colour)}
           opacity={el.opacity}
           strokeWidth={0}
           hitStrokeWidth={HIT}
@@ -276,7 +284,7 @@ function Body({ el, notesPath, today, onToggleItem, onPillClick }: Props) {
       return (
         <Line
           points={el.points}
-          stroke={el.colour}
+          stroke={t.ink(el.colour)}
           strokeWidth={el.width}
           lineCap="round"
           hitStrokeWidth={HIT}
@@ -287,8 +295,8 @@ function Body({ el, notesPath, today, onToggleItem, onPillClick }: Props) {
       return (
         <Arrow
           points={el.points}
-          stroke={el.colour}
-          fill={el.colour}
+          stroke={t.ink(el.colour)}
+          fill={t.ink(el.colour)}
           strokeWidth={el.width}
           pointerLength={8 + el.width * 2}
           pointerWidth={8 + el.width * 2}
@@ -303,7 +311,7 @@ function Body({ el, notesPath, today, onToggleItem, onPillClick }: Props) {
         <Rect
           width={el.w}
           height={el.h}
-          stroke={el.colour}
+          stroke={t.ink(el.colour)}
           strokeWidth={el.width}
           dash={el.dashed ? [el.width * 3, el.width * 2.5] : undefined}
           cornerRadius={4}
@@ -318,7 +326,7 @@ function Body({ el, notesPath, today, onToggleItem, onPillClick }: Props) {
           y={el.h / 2}
           radiusX={el.w / 2}
           radiusY={el.h / 2}
-          stroke={el.colour}
+          stroke={t.ink(el.colour)}
           strokeWidth={el.width}
           dash={el.dashed ? [el.width * 3, el.width * 2.5] : undefined}
           hitStrokeWidth={HIT}
@@ -336,7 +344,7 @@ function Body({ el, notesPath, today, onToggleItem, onPillClick }: Props) {
           fontStyle={f.fontStyle ?? "normal"}
           letterSpacing={f.letterSpacing ?? 0}
           lineHeight={f.lineHeight ?? LINE_HEIGHT}
-          fill={el.colour}
+          fill={t.ink(el.colour)}
           wrap="word"
         />
       );
@@ -361,9 +369,10 @@ function Checklist({
   onToggleItem?: (elementId: string, itemId: string) => void;
   onPillClick?: (elementId: string, itemId?: string) => void;
 }) {
-  const ink = token("--ink-white");
-  const mint = token("--mint");
-  const muted = token("--text-muted");
+  const t = useCanvasTheme();
+  const ink = t.token("--ink-white");
+  const mint = t.token("--mint");
+  const muted = t.token("--text-muted");
   const rows = checklistRows(el);
   const total = rows.length ? rows[rows.length - 1].y + rows[rows.length - 1].h : CHECK_SIZE;
   return (
@@ -435,13 +444,15 @@ function ImageBody({
   el: Extract<Element, { type: "image" }>;
   notesPath: string;
 }) {
+  const t = useCanvasTheme();
   const img = useAsset(notesPath, el.asset);
+  if (!t.images) return null;
   if (!img) {
     return (
       <Rect
         width={el.w}
         height={el.h}
-        stroke={token("--line-strong")}
+        stroke={t.token("--line-strong")}
         dash={[6, 6]}
         strokeWidth={2}
       />

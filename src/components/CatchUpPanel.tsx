@@ -254,6 +254,11 @@ function SummaryView() {
         {st.recentPages === 1 ? "" : "s"} and {st.stalePages} page{st.stalePages === 1 ? "" : "s"}{" "}
         left untouched.
         {st.truncated ? " Long notes were cut short to fit." : ""}
+        {typeof saved.snapshots === "number" && saved.snapshots > 0
+          ? ` Included ${saved.snapshots} page snapshot${saved.snapshots === 1 ? "" : "s"}.`
+          : typeof saved.snapshots === "string"
+            ? ` No page snapshots: ${saved.snapshots}.`
+            : ""}
         {saved.result.kind === "sections" && saved.result.dropped > 0
           ? ` ${saved.result.dropped} item${saved.result.dropped === 1 ? " without a valid link was" : "s without a valid link were"} left out.`
           : ""}{" "}

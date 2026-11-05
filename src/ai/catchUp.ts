@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { backend } from "../storage/backend";
 import { useNotebook, visibleTabs } from "../store/notebook";
-import { AiRequestError, createProvider, type AiErrorKind } from "./client";
+import { AiRequestError, createProvider, listModelsCached, type AiErrorKind } from "./client";
+import { bytesToBase64, renderPagePng } from "../export/render";
 import { buildCatchUpContext, type CatchUpContext, type Ref } from "./payload";
 import { SUMMARY_SYSTEM, chatSystem } from "./prompts";
 import { parseSummary, type ParsedSummary } from "./summary";
@@ -19,7 +20,60 @@ export type SavedSummary = {
   result: ParsedSummary;
   refs: Record<string, Ref>;
   stats: CatchUpContext["stats"];
+  /** How many page snapshots were sent, or why none were. */
+  snapshots?: number | string;
 };
+
+const MAX_SNAPSHOTS = 5;
+
+/**
+ * Pictures of up to five recently edited pages, so handwriting and diagrams can
+ * be read (SPEC: What gets sent, optional). Only for models that accept images.
+ */
+async function pageSnapshots(
+  tabId: string,
+  ctx: CatchUpContext,
+): Promise<{ images: string[]; note: string; skipped?: string }> {
+  const s = useNotebook.getState();
+  const ai = s.config.ai;
+  const model = ai.models[ai.provider] ?? "";
+  const vision = await listModelsCached(
+    ai.provider,
+    ai.provider === "custom" ? ai.customBaseUrl : undefined,
+  )
+    .then(({ models }) => !!models.find((m) => m.id === model)?.vision)
+    .catch(() => false);
+  if (!vision) return { images: [], note: "", skipped: "the model does not take images" };
+
+  const pages = visibleTabs(s.config)
+    .filter((t) => !t.excludeFromAi && (!tabId || t.id === tabId))
+    .flatMap((tab) => {
+      const st = s.tabs[tab.id];
+      return st?.status === "ok"
+        ? st.pages.map((p) => ({ tab, notesPath: st.notesPath, page: p.page }))
+        : [];
+    })
+    .sort((a, b) => b.page.updatedAt.localeCompare(a.page.updatedAt))
+    .slice(0, MAX_SNAPSHOTS);
+
+  const images: string[] = [];
+  const names: string[] = [];
+  for (const { tab, notesPath, page } of pages) {
+    const png = await renderPagePng(page, notesPath, {
+      theme: "screen",
+      pixelRatio: 1,
+      includeImages: true,
+      grid: s.config.general.gridSize,
+    });
+    images.push(bytesToBase64(png));
+    const ref = Object.entries(ctx.refs).find(([, r]) => r.pageId === page.id && !r.elementId)?.[0];
+    names.push(`${ref ? `[${ref}] ` : ""}${tab.name} › ${page.title || "Untitled page"}`);
+  }
+  const note = images.length
+    ? `Snapshots of these pages are attached, in this order, so you can read handwriting and diagrams: ${names.join("; ")}.`
+    : "";
+  return { images, note };
+}
 
 export type ChatTurn = { role: "user" | "assistant"; text: string };
 export type PanelError = {
@@ -124,9 +178,16 @@ export const useCatchUp = create<CatchUpStore>((set, get) => ({
     controller = new AbortController();
     set({ running: { kind: "summary", chars: 0 }, error: null });
     try {
+      const snaps = ai.includeSnapshots ? await pageSnapshots(tabId, ctx) : null;
       const raw = await provider.complete({
         system: SUMMARY_SYSTEM,
-        messages: [{ role: "user", content: ctx.text }],
+        messages: [
+          {
+            role: "user",
+            content: snaps?.note ? `${ctx.text}\n\n${snaps.note}` : ctx.text,
+            images: snaps?.images,
+          },
+        ],
         maxTokens: SUMMARY_MAX_TOKENS,
         temperature: ai.temperature,
         json: true,
@@ -142,6 +203,7 @@ export const useCatchUp = create<CatchUpStore>((set, get) => ({
         result: parseSummary(raw, ctx.refs),
         refs: ctx.refs,
         stats: ctx.stats,
+        snapshots: snaps ? (snaps.skipped ?? snaps.images.length) : undefined,
       };
       chatContext = ctx;
       set({ saved, chat: [], chatRefs: ctx.refs });

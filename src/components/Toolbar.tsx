@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { INK_COLOURS, STROKE_WIDTHS } from "../model/config";
 import { restyle } from "../canvas/elements";
 import { useCatchUp } from "../ai/catchUp";
+import { useExportDialog } from "./ExportDialog";
 import { currentPageOf, historyFor, useNotebook } from "../store/notebook";
 import { useTools, type ToolId } from "../store/tools";
 import {
@@ -11,6 +12,7 @@ import {
   CatchUpIcon,
   CircleIcon,
   EraserIcon,
+  ExportIcon,
   GearIcon,
   GridIcon,
   ImageIcon,
@@ -156,6 +158,14 @@ export function Toolbar() {
         >
           <CatchUpIcon size={18} />
           Catch me up
+        </button>
+        <button
+          className="icon-button"
+          aria-label="Export"
+          title="Export (Ctrl+Shift+E)"
+          onClick={() => useExportDialog.getState().setOpen(true)}
+        >
+          <ExportIcon />
         </button>
         <button
           className="icon-button"

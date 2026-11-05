@@ -126,14 +126,13 @@ export function AiSection() {
           <input
             type="checkbox"
             checked={ai.includeSnapshots}
-            disabled
-            onChange={() => undefined}
+            onChange={(e) => setAi({ includeSnapshots: e.target.checked })}
           />
           <span>
             Include page snapshots
             <span className="hint">
-              Lets image-capable models read handwriting and diagrams. Arrives with the page
-              renderer in milestone 5.
+              Sends pictures of up to 5 recently edited pages, so handwriting and diagrams can be
+              read. Only used when the chosen model accepts images.
             </span>
           </span>
         </label>

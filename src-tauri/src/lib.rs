@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{ai, assets, fs, keychain};
+use commands::{ai, assets, export, fs, keychain};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -29,6 +29,10 @@ pub fn run() {
             ai::ai_list_models,
             ai::ai_complete,
             ai::ai_cancel,
+            export::export_prepare_dir,
+            export::export_write,
+            export::export_write_text,
+            export::export_copy_asset,
         ])
         .run(tauri::generate_context!())
         .expect("error while running Engineer's Notebook");

@@ -1307,6 +1307,106 @@ button:disabled {
   font-size: 14px;
 }
 
+/* ---------- Export dialog ---------- */
+
+.export-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 18px 22px 22px;
+  border-radius: var(--radius-popover);
+  background: var(--desk);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-popover);
+  z-index: 45;
+}
+
+.export-dialog header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.export-dialog h2 {
+  margin: 0 auto 0 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+}
+
+.export-dialog form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.export-dialog fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+}
+
+.export-dialog fieldset.checks {
+  flex-direction: column;
+}
+
+.export-dialog legend {
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.export-dialog fieldset label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  color: var(--text);
+}
+
+.export-dialog fieldset label.disabled {
+  color: var(--text-muted);
+}
+
+.export-dialog input[type="radio"],
+.export-dialog input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--mint);
+}
+
+.export-dialog .path {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--mint-soft);
+}
+
+.export-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.export-progress p {
+  margin: 0;
+}
+
+.export-progress progress {
+  width: 100%;
+  height: 10px;
+  accent-color: var(--mint);
+}
+
 /* ---------- Context menu ---------- */
 
 .context-menu {
