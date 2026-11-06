@@ -67,17 +67,31 @@ export function App() {
     if (useNotebook.getState().config.general.checkForUpdates) void useUpdates.getState().check();
   }, [ready]);
 
-  // Save anything pending before the window closes.
+  // Save anything pending before the window closes. Tauri then destroys the window, which needs
+  // the core:window:allow-destroy permission. A failed or slow save must never stop the close.
   useEffect(() => {
     if (!backend.isTauri) return;
     let unlisten: (() => void) | undefined;
+    let disposed = false;
     void import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
       const win = getCurrentWindow();
-      unlisten = await win.onCloseRequested(async () => {
-        await useNotebook.getState().flushSaves();
+      const off = await win.onCloseRequested(async () => {
+        try {
+          await Promise.race([
+            useNotebook.getState().flushSaves(),
+            new Promise((resolve) => setTimeout(resolve, 3000)),
+          ]);
+        } catch (e) {
+          console.error("Saving before close failed", e);
+        }
       });
+      if (disposed) off();
+      else unlisten = off;
     });
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   // Global shortcuts.
