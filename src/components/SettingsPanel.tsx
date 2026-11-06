@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { INK_COLOURS, type TabConfig } from "../model/config";
 import { backend } from "../storage/backend";
 import { notesPathFor } from "../storage/paths";
 import { useNotebook, visibleTabs } from "../store/notebook";
-import { CloseIcon } from "./Icons";
+import { CloseIcon, GripIcon } from "./Icons";
+import { ColourPicker } from "./ColourPicker";
+import { useDragReorder } from "./useDragReorder";
 import { AiSection } from "./AiSettings";
 import { ExportSection } from "./ExportSettings";
 import { GeneralSection } from "./GeneralSettings";
@@ -73,6 +75,13 @@ function ClientsSection() {
   const [adding, setAdding] = useState(config.tabs.length === 0);
   const [error, setError] = useState<string | null>(null);
   const list = visibleTabs(config);
+  const ids = list.map((t) => t.id);
+  const archived = config.tabs
+    .filter((t) => t.archived)
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const moveTab = useNotebook((s) => s.moveTab);
+  const onMove = useCallback((id: string, slot: number) => void moveTab(id, slot), [moveTab]);
+  const { listRef, drag, start, onClickCapture, dropMark } = useDragReorder<HTMLDivElement>(onMove);
 
   async function onChangeFolder(t: TabConfig) {
     setError(null);
@@ -105,66 +114,124 @@ function ClientsSection() {
 
       {list.length === 0 && !adding && <p className="lead">No clients yet.</p>}
 
-      {list.map((t) => {
-        const st = tabs[t.id];
-        const missing = st?.status === "missing";
-        return (
-          <div className="client-row" key={t.id}>
-            <span className="marker" style={{ background: t.colour }} aria-hidden="true" />
-            <div className="meta">
-              <strong>{t.name}</strong>
-              <span title={notesPathFor(t.folder)}>
-                {missing ? "Folder not found: " : ""}
-                {notesPathFor(t.folder)}
-              </span>
-            </div>
-            <div className="row-actions">
-              <label className="exclude-ai" title="Never send this tab's notes to the AI provider">
-                <input
-                  type="checkbox"
-                  checked={t.excludeFromAi}
-                  onChange={(e) =>
-                    void updateConfig((c) => ({
-                      ...c,
-                      tabs: c.tabs.map((x) =>
-                        x.id === t.id ? { ...x, excludeFromAi: e.target.checked } : x,
-                      ),
-                    }))
+      <div
+        className={`client-list${drag ? " reordering" : ""}`}
+        ref={listRef}
+        onClickCapture={onClickCapture}
+      >
+        {list.map((t, i) => {
+          const st = tabs[t.id];
+          const missing = st?.status === "missing";
+          return (
+            <div
+              className={`client-row${drag?.id === t.id ? " dragging" : ""}`}
+              key={t.id}
+              data-reorder-id={t.id}
+              data-drop={dropMark(ids, i)}
+            >
+              <button
+                type="button"
+                className="grip"
+                aria-label={`Move ${t.name}. Drag, or use the up and down arrow keys.`}
+                title="Drag to reorder"
+                onPointerDown={start(t.id)}
+                onKeyDown={(e) => {
+                  if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+                  e.preventDefault();
+                  const target = e.currentTarget.closest("[data-reorder-id]");
+                  // Read the order now, not from the last render, so quick presses all count.
+                  const from = visibleTabs(useNotebook.getState().config).findIndex(
+                    (x) => x.id === t.id,
+                  );
+                  void moveTab(t.id, e.key === "ArrowUp" ? from - 1 : from + 2);
+                  // Moving the row in the page drops focus; put it back before the next press.
+                  requestAnimationFrame(() =>
+                    target?.querySelector<HTMLButtonElement>(".grip")?.focus(),
+                  );
+                }}
+              >
+                <GripIcon size={18} />
+              </button>
+              <span className="marker" style={{ background: t.colour }} aria-hidden="true" />
+              <div className="meta">
+                <strong>{t.name}</strong>
+                <span title={notesPathFor(t.folder)}>
+                  {missing ? "Folder not found: " : ""}
+                  {notesPathFor(t.folder)}
+                </span>
+              </div>
+              <div className="row-actions">
+                <label
+                  className="exclude-ai"
+                  title="Never send this tab's notes to the AI provider"
+                >
+                  <input
+                    type="checkbox"
+                    checked={t.excludeFromAi}
+                    onChange={(e) =>
+                      void updateConfig((c) => ({
+                        ...c,
+                        tabs: c.tabs.map((x) =>
+                          x.id === t.id ? { ...x, excludeFromAi: e.target.checked } : x,
+                        ),
+                      }))
+                    }
+                  />
+                  Exclude from AI
+                </label>
+                <button
+                  className="small-button"
+                  disabled={missing}
+                  onClick={() =>
+                    void backend
+                      .openInExplorer(notesPathFor(t.folder))
+                      .catch((e) => setError(String(e)))
                   }
-                />
-                Exclude from AI
-              </label>
-              <button
-                className="small-button"
-                disabled={missing}
-                onClick={() =>
-                  void backend
-                    .openInExplorer(notesPathFor(t.folder))
-                    .catch((e) => setError(String(e)))
-                }
-              >
-                Open folder
-              </button>
-              <button className="small-button" onClick={() => void onChangeFolder(t)}>
-                Change folder
-              </button>
-              <button
-                className="small-button"
-                onClick={() =>
-                  void updateConfig((c) => ({
-                    ...c,
-                    tabs: c.tabs.map((x) => (x.id === t.id ? { ...x, archived: true } : x)),
-                  }))
-                }
-              >
-                Archive
-              </button>
+                >
+                  Open folder
+                </button>
+                <button className="small-button" onClick={() => void onChangeFolder(t)}>
+                  Change folder
+                </button>
+                <button
+                  className="small-button"
+                  onClick={() => void useNotebook.getState().archiveTab(t.id)}
+                >
+                  Archive
+                </button>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
 
       {error && <p className="form-error">{error}</p>}
+
+      {archived.length > 0 && (
+        <section className="archived-clients" aria-labelledby="archived-heading">
+          <h4 id="archived-heading">Archived</h4>
+          <p className="lead">Hidden from the tabs. Their folders and pages are untouched.</p>
+          {archived.map((t) => (
+            <div className="client-row archived" key={t.id}>
+              <span className="marker" style={{ background: t.colour }} aria-hidden="true" />
+              <div className="meta">
+                <strong>{t.name}</strong>
+                <span title={notesPathFor(t.folder)}>{notesPathFor(t.folder)}</span>
+              </div>
+              <div className="row-actions">
+                <button
+                  className="small-button"
+                  onClick={() => {
+                    void useNotebook.getState().restoreTab(t.id);
+                  }}
+                >
+                  Restore
+                </button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {adding ? (
         <AddClientForm onDone={() => setAdding(false)} canCancel={list.length > 0} />
@@ -233,25 +300,7 @@ function AddClientForm({ onDone, canCancel }: { onDone: () => void; canCancel: b
       </label>
       <div className="field">
         <span id="colour-label">Colour</span>
-        <div className="colour-picker swatches" role="group" aria-labelledby="colour-label">
-          {INK_COLOURS.map((c) => (
-            <button
-              type="button"
-              key={c.id}
-              className="swatch"
-              aria-label={c.label}
-              aria-pressed={colour === c.value}
-              style={{ background: c.value }}
-              onClick={() => setColour(c.value)}
-            />
-          ))}
-          <input
-            type="color"
-            aria-label="Custom colour"
-            value={colour}
-            onChange={(e) => setColour(e.target.value)}
-          />
-        </div>
+        <ColourPicker value={colour} onChange={setColour} labelledBy="colour-label" />
       </div>
       <div className="field">
         Folder

@@ -17,6 +17,7 @@ import {
   type History,
 } from "../canvas/history";
 import { duplicate } from "../canvas/elements";
+import { applyTabOrder, moveToSlot } from "./tabOrder";
 import { backend } from "../storage/backend";
 import {
   forgetDiskText,
@@ -66,6 +67,15 @@ type NotebookStore = {
     notesPath: string;
   }): Promise<void>;
   changeFolder(tabId: string, folder: string, notesPath: string): Promise<void>;
+  /** Renames a tab (and its `notebook.json`). Blank names are ignored. */
+  renameTab(tabId: string, name: string): Promise<void>;
+  setTabColour(tabId: string, colour: string): Promise<void>;
+  /** Hides a tab from the side; its files are untouched. Opens a neighbour if it was open. */
+  archiveTab(tabId: string): Promise<void>;
+  /** Brings an archived tab back at the end of the list and opens it. */
+  restoreTab(tabId: string): Promise<void>;
+  /** Moves a visible tab to an insertion slot (0 = top, n = bottom). */
+  moveTab(tabId: string, slot: number): Promise<void>;
   reloadTab(tabId: string): Promise<void>;
   openTab(tabId: string): void;
   openReminders(): void;
@@ -252,6 +262,14 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     }
   }
 
+  /** Best effort: the app config is the source of truth for names and colours. */
+  function syncNotebookMeta(tabId: string) {
+    const tab = get().config.tabs.find((t) => t.id === tabId);
+    const state = get().tabs[tabId];
+    if (!tab || state?.status !== "ok") return;
+    void backend.updateNotebookMeta(state.notesPath, tab.name, tab.colour).catch(() => undefined);
+  }
+
   function watchFolder(tabId: string, notesPath: string | null) {
     const old = watched.get(tabId);
     if (old === notesPath) return;
@@ -414,6 +432,72 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       await get().reloadTab(id);
       void notesPath;
       get().openTab(id);
+    },
+
+    async renameTab(tabId, name) {
+      const clean = name.trim();
+      const tab = get().config.tabs.find((t) => t.id === tabId);
+      if (!clean || !tab || tab.name === clean) return;
+      await get().updateConfig((c) => ({
+        ...c,
+        tabs: c.tabs.map((t) => (t.id === tabId ? { ...t, name: clean } : t)),
+      }));
+      syncNotebookMeta(tabId);
+    },
+
+    async setTabColour(tabId, colour) {
+      const tab = get().config.tabs.find((t) => t.id === tabId);
+      if (!tab || tab.colour === colour) return;
+      await get().updateConfig((c) => ({
+        ...c,
+        tabs: c.tabs.map((t) => (t.id === tabId ? { ...t, colour } : t)),
+      }));
+      syncNotebookMeta(tabId);
+    },
+
+    async archiveTab(tabId) {
+      const before = visibleTabs(get().config);
+      const index = before.findIndex((t) => t.id === tabId);
+      if (index < 0) return;
+      const name = before[index].name;
+      await get().updateConfig((c) => ({
+        ...c,
+        tabs: c.tabs.map((t) => (t.id === tabId ? { ...t, archived: true } : t)),
+      }));
+      const view = get().view;
+      if (view.kind === "tab" && view.tabId === tabId) {
+        const rest = before.filter((t) => t.id !== tabId);
+        const next = rest[Math.min(index, rest.length - 1)];
+        if (next) get().openTab(next.id);
+        else set({ view: { kind: "empty" }, pageListOpen: false });
+      }
+      set({
+        notice: `Archived "${name}". Its files are untouched; restore it from Settings, Clients and folders.`,
+      });
+    },
+
+    async restoreTab(tabId) {
+      const tab = get().config.tabs.find((t) => t.id === tabId);
+      if (!tab?.archived) return;
+      const order = Math.max(-1, ...visibleTabs(get().config).map((t) => t.order)) + 1;
+      if (get().notice?.startsWith(`Archived "${tab.name}"`)) set({ notice: null });
+      await get().updateConfig((c) => ({
+        ...c,
+        tabs: c.tabs.map((t) => (t.id === tabId ? { ...t, archived: false, order } : t)),
+      }));
+      const state = get().tabs[tabId];
+      if (!state || state.status !== "ok") {
+        setTab(tabId, { status: "loading" });
+        await get().reloadTab(tabId);
+      }
+      get().openTab(tabId);
+    },
+
+    async moveTab(tabId, slot) {
+      const ids = visibleTabs(get().config).map((t) => t.id);
+      const next = moveToSlot(ids, tabId, slot);
+      if (next.every((id, i) => id === ids[i])) return;
+      await get().updateConfig((c) => ({ ...c, tabs: applyTabOrder(c.tabs, next) }));
     },
 
     async changeFolder(tabId, folder) {

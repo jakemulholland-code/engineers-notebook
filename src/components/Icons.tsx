@@ -143,6 +143,14 @@ export const FolderIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const GripIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path
+      d="M7.5 5h.01M12.5 5h.01M7.5 10h.01M12.5 10h.01M7.5 15h.01M12.5 15h.01"
+      strokeWidth={2.6}
+    />
+  </Svg>
+);
 export const PencilIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M13 3.5l3.5 3.5L7 16.5H3.5V13z" />

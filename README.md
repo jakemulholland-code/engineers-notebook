@@ -97,6 +97,12 @@ npm run e2e:pages
 npm run e2e:watch
 ```
 
+`e2e:tabs` covers the tab right-click menu (rename, change colour, archive), dragging and Alt+arrow keys to reorder tabs, reordering in Settings, and restoring archived tabs. Start the app with `ENGINEERS_NOTEBOOK_APP_DIR` set to `test-fixtures\_scratch\appdata-tabs`, then:
+
+```bash
+npm run e2e:tabs
+```
+
 ## Export
 
 Export (toolbar button or Ctrl+Shift+E) writes Markdown, PDF or both for all tabs, one tab or the current page into a new `notebook-export-<date>` folder in the chosen destination (`-2`, `-3` and so on if one already exists, so nothing is overwritten):

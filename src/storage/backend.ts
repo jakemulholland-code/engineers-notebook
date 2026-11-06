@@ -31,6 +31,8 @@ export interface Backend {
   /** Moves a page file (and its `.bak`) to the Recycle Bin. Never a hard delete. */
   trashPageFile(path: string): Promise<void>;
   openInExplorer(path: string): Promise<void>;
+  /** Keeps the name and colour in this app's `notebook.json` in step (other apps' files are left alone). */
+  updateNotebookMeta(notesPath: string, name: string, colour: string): Promise<void>;
   /** Starts watching `<notes>/pages`; changes arrive as `notes-changed` events. */
   watchNotesFolder(notesPath: string): Promise<void>;
   unwatchNotesFolder(notesPath: string): Promise<void>;
@@ -65,6 +67,8 @@ const tauriBackend: Backend = {
   renameFile: (from, to) => invoke("rename_file", { from, to }),
   trashPageFile: (path) => invoke("trash_page_file", { path }),
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
+  updateNotebookMeta: (notesPath, name, colour) =>
+    invoke("update_notebook_meta", { notesPath, name, colour }),
   watchNotesFolder: (notesPath) => invoke("watch_notes_folder", { notesPath }),
   unwatchNotesFolder: (notesPath) => invoke("unwatch_notes_folder", { notesPath }),
   saveAsset: (notesPath, dataBase64) => invoke<string>("save_asset", { notesPath, dataBase64 }),
@@ -139,6 +143,7 @@ function createMemoryBackend(): Backend {
       files.delete(`${p}.bak`);
     },
     openInExplorer: async () => undefined,
+    updateNotebookMeta: async () => undefined,
     // Nothing changes outside the app in the browser preview.
     watchNotesFolder: async () => undefined,
     unwatchNotesFolder: async () => undefined,

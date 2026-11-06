@@ -47,6 +47,7 @@ pub fn run() {
             fs::rename_file,
             fs::open_in_explorer,
             fs::trash_page_file,
+            fs::update_notebook_meta,
             watch::watch_notes_folder,
             watch::unwatch_notes_folder,
             fs::open_app_dir,

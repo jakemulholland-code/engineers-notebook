@@ -224,6 +224,32 @@ pub fn prepare_client_folder(
     prepare_folder(Path::new(&folder), &name, &colour, allow_foreign)
 }
 
+/// Keeps the tab name and colour in this app's `notebook.json` in step with the app config.
+/// Leaves any other app's file, and every other key, alone.
+pub fn update_notebook_meta_in(notes: &Path, name: &str, colour: &str) -> Result<(), String> {
+    if !is_our_notebook(notes) {
+        return Ok(());
+    }
+    let path = notes.join("notebook.json");
+    let text = fs::read_to_string(&path).map_err(err)?;
+    let mut v: serde_json::Value = serde_json::from_str(&text).map_err(err)?;
+    let Some(obj) = v.as_object_mut() else {
+        return Ok(());
+    };
+    obj.insert("name".into(), serde_json::Value::String(name.into()));
+    obj.insert("colour".into(), serde_json::Value::String(colour.into()));
+    let out = serde_json::to_string_pretty(&v).map_err(err)?;
+    if out != text {
+        atomic_write(&path, out.as_bytes())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn update_notebook_meta(notes_path: String, name: String, colour: String) -> Result<(), String> {
+    update_notebook_meta_in(Path::new(&notes_path), &name, &colour)
+}
+
 /// File names (not paths) of every `*.page.json` in `<notes>/pages`.
 #[tauri::command]
 pub fn list_page_files(notes_path: String) -> Result<Vec<String>, String> {
@@ -317,6 +343,28 @@ pub fn open_in_explorer(app: tauri::AppHandle, path: String) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notebook_meta_updates_only_our_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let ours = dir.path().join("a");
+        fs::create_dir_all(&ours).unwrap();
+        prepare_folder(&ours, "Old name", "#01C6A3", false).unwrap();
+        let notes = ours.join("notes");
+        update_notebook_meta_in(&notes, "New name", "#E8A828").unwrap();
+        let v: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(notes.join("notebook.json")).unwrap()).unwrap();
+        assert_eq!(v["name"], "New name");
+        assert_eq!(v["colour"], "#E8A828");
+        assert_eq!(v["app"], APP_MARKER);
+        assert!(v["pageOrder"].is_array());
+
+        let other = dir.path().join("b").join("notes");
+        fs::create_dir_all(&other).unwrap();
+        fs::write(other.join("notebook.json"), r#"{"name":"Theirs"}"#).unwrap();
+        update_notebook_meta_in(&other, "New name", "#E8A828").unwrap();
+        assert_eq!(fs::read_to_string(other.join("notebook.json")).unwrap(), r#"{"name":"Theirs"}"#);
+    }
 
     #[test]
     fn only_page_files_in_notes_pages_can_be_binned() {
