@@ -500,6 +500,13 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
     tr.getLayer()?.batchDraw();
   }, [selectedIds, page.elements, editing, tool]);
 
+  // A page reloaded from disk may no longer have some selected elements.
+  useEffect(() => {
+    const ids = new Set(page.elements.map((el) => el.id));
+    const sel = live.current.selected;
+    if (sel.some((id) => !ids.has(id))) setSelected(sel.filter((id) => ids.has(id)));
+  }, [page.elements, setSelected]);
+
   const onTransformEnd = () => {
     const tr = trRef.current;
     if (!tr) return;

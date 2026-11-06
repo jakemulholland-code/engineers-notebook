@@ -31,6 +31,9 @@ export interface Backend {
   /** Moves a page file (and its `.bak`) to the Recycle Bin. Never a hard delete. */
   trashPageFile(path: string): Promise<void>;
   openInExplorer(path: string): Promise<void>;
+  /** Starts watching `<notes>/pages`; changes arrive as `notes-changed` events. */
+  watchNotesFolder(notesPath: string): Promise<void>;
+  unwatchNotesFolder(notesPath: string): Promise<void>;
   /** Saves PNG bytes (base64) into `<notes>/assets`, de-duplicated; returns `assets/<sha256>.png`. */
   saveAsset(notesPath: string, pngBase64: string): Promise<string>;
   readAsset(notesPath: string, rel: string): Promise<ArrayBuffer>;
@@ -62,6 +65,8 @@ const tauriBackend: Backend = {
   renameFile: (from, to) => invoke("rename_file", { from, to }),
   trashPageFile: (path) => invoke("trash_page_file", { path }),
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
+  watchNotesFolder: (notesPath) => invoke("watch_notes_folder", { notesPath }),
+  unwatchNotesFolder: (notesPath) => invoke("unwatch_notes_folder", { notesPath }),
   saveAsset: (notesPath, dataBase64) => invoke<string>("save_asset", { notesPath, dataBase64 }),
   readAsset: (notesPath, rel) => invoke<ArrayBuffer>("read_asset", { notesPath, rel }),
   exportPrepareDir: (dest, date) => invoke<string>("export_prepare_dir", { dest, date }),
@@ -134,6 +139,9 @@ function createMemoryBackend(): Backend {
       files.delete(`${p}.bak`);
     },
     openInExplorer: async () => undefined,
+    // Nothing changes outside the app in the browser preview.
+    watchNotesFolder: async () => undefined,
+    unwatchNotesFolder: async () => undefined,
     saveAsset: async (notesPath, b64) => {
       const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
       const digest = await crypto.subtle.digest("SHA-256", bytes);

@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{ai, assets, export, fs, keychain};
+use commands::{ai, assets, export, fs, keychain, watch};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -30,6 +30,7 @@ pub fn run() {
 
     builder
         .manage(ai::AiState::default())
+        .manage(watch::WatchState::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -46,6 +47,8 @@ pub fn run() {
             fs::rename_file,
             fs::open_in_explorer,
             fs::trash_page_file,
+            watch::watch_notes_folder,
+            watch::unwatch_notes_folder,
             fs::open_app_dir,
             fs::backup_config,
             assets::save_asset,

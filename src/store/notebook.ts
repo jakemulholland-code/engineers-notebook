@@ -4,6 +4,7 @@ import {
   createPage,
   newId,
   pageFileName,
+  parsePage,
   uniquePageFileName,
   type Element,
   type Page,
@@ -17,7 +18,14 @@ import {
 } from "../canvas/history";
 import { duplicate } from "../canvas/elements";
 import { backend } from "../storage/backend";
-import { loadTab, savePage, type LoadedPage } from "../storage/notebook";
+import {
+  forgetDiskText,
+  knownDiskText,
+  loadTab,
+  rememberDiskText,
+  savePage,
+  type LoadedPage,
+} from "../storage/notebook";
 import { pagePath } from "../storage/paths";
 import type { ReminderIndex } from "../reminders/index";
 
@@ -89,6 +97,12 @@ type NotebookStore = {
   /** Bumped whenever undo/redo availability may have changed. */
   historyTick: number;
   flushSaves(): Promise<void>;
+  /**
+   * Applies page files changed outside the app (from the folder watcher). Pages without
+   * unsaved edits are reloaded, added or removed; pages with unsaved edits keep the in-app
+   * version and show a notice.
+   */
+  applyOutsideChanges(notesPath: string, fileNames: string[], rescan?: boolean): Promise<void>;
 };
 
 const histories = new Map<string, History<Element[]>>();
@@ -124,6 +138,12 @@ export function currentPageOf(s: Pick<NotebookStore, "view" | "tabs" | "currentP
 
 const timers = new Map<string, ReturnType<typeof setTimeout>>();
 const pending = new Map<string, () => Promise<void>>();
+/** Saves that have started writing and not finished yet, by `${tabId}:${pageId}`. */
+const inFlight = new Map<string, Promise<void>>();
+/** Outside changes are applied one batch at a time per notes folder. */
+const outsideQueue = new Map<string, Promise<void>>();
+/** Notes folders being watched, by tab id. */
+const watched = new Map<string, string>();
 
 function scheduleSave(key: string, run: () => Promise<void>) {
   const old = timers.get(key);
@@ -155,7 +175,16 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     void get().updateConfig((cfg) => ({ ...cfg, lastOpened: { tabId, pageId } }));
   }
 
-  async function savePageNow(tabId: string, pageId: string) {
+  function savePageNow(tabId: string, pageId: string): Promise<void> {
+    const key = `${tabId}:${pageId}`;
+    const run = writePage(tabId, pageId).finally(() => {
+      if (inFlight.get(key) === run) inFlight.delete(key);
+    });
+    inFlight.set(key, run);
+    return run;
+  }
+
+  async function writePage(tabId: string, pageId: string) {
     const tab = get().tabs[tabId];
     if (!tab || tab.status !== "ok") return;
     const loaded = tab.pages.find((p) => p.page.id === pageId);
@@ -171,7 +200,12 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       if (!matches.test(fileName)) {
         const taken = new Set(tab.pages.filter((p) => p !== loaded).map((p) => p.fileName));
         const next = uniquePageFileName(loaded.page, taken);
-        await backend.renameFile(pagePath(tab.notesPath, fileName), pagePath(tab.notesPath, next));
+        const from = pagePath(tab.notesPath, fileName);
+        // The old file may have been deleted outside the app; then just write the new one.
+        if (await backend.pathExists(from)) {
+          await backend.renameFile(from, pagePath(tab.notesPath, next));
+        }
+        forgetDiskText(from);
         fileName = next;
         await savePage(tab.notesPath, fileName, loaded.page);
       } else {
@@ -188,6 +222,124 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     } catch (e) {
       set({ save: { kind: "error", message: String(e) } });
     }
+  }
+
+  /** Takes a page out of a tab's state and, if it was open, opens its neighbour. */
+  function dropPage(tabId: string, pageId: string) {
+    histories.delete(pageId);
+    const cur = get().tabs[tabId];
+    if (cur?.status !== "ok") return;
+    const index = cur.pages.findIndex((p) => p.page.id === pageId);
+    if (index < 0) return;
+    const pages = cur.pages.filter((p) => p.page.id !== pageId);
+    setTab(tabId, { ...cur, pages });
+    if (get().currentPage[tabId] !== pageId && pages.length > 0) return;
+    const next = pages[Math.min(index, pages.length - 1)];
+    set((s) => {
+      const currentPage = { ...s.currentPage };
+      if (next) currentPage[tabId] = next.page.id;
+      else delete currentPage[tabId];
+      return { currentPage };
+    });
+    const view = get().view;
+    if (view.kind === "tab" && view.tabId === tabId) {
+      rememberLast(tabId, next?.page.id);
+      set({
+        save: next?.readOnly
+          ? { kind: "read-only", reason: next.warning ?? "" }
+          : { kind: "saved" },
+      });
+    }
+  }
+
+  function watchFolder(tabId: string, notesPath: string | null) {
+    const old = watched.get(tabId);
+    if (old === notesPath) return;
+    if (old) {
+      watched.delete(tabId);
+      void backend.unwatchNotesFolder(old).catch(() => undefined);
+    }
+    if (notesPath) {
+      watched.set(tabId, notesPath);
+      void backend.watchNotesFolder(notesPath).catch(() => watched.delete(tabId));
+    }
+  }
+
+  /** One changed file: reload, add or remove its page, unless the app has unsaved edits. */
+  async function applyOutsideFile(tabId: string, fileName: string) {
+    const start = get().tabs[tabId];
+    if (start?.status !== "ok") return;
+    const path = pagePath(start.notesPath, fileName);
+
+    // Let any save of this file finish first, so the app's own write never looks external.
+    const before = start.pages.find((p) => p.fileName === fileName);
+    const writing = before && inFlight.get(`${tabId}:${before.page.id}`);
+    if (writing) await writing.catch(() => undefined);
+
+    const exists = await backend.pathExists(path);
+    const text = exists ? await backend.readTextFile(path).catch(() => null) : null;
+    if (exists && text === null) return;
+    if (text !== null && text === knownDiskText(path)) return;
+
+    const tab = get().tabs[tabId];
+    if (tab?.status !== "ok") return;
+    const unsaved = (pageId: string) =>
+      pending.has(`${tabId}:${pageId}`) || inFlight.has(`${tabId}:${pageId}`);
+    const byName = tab.pages.find((p) => p.fileName === fileName);
+
+    if (text === null) {
+      // Removed or renamed outside the app.
+      if (!byName) return;
+      if (unsaved(byName.page.id)) {
+        set({
+          notice: `"${byName.page.title}" was deleted outside the app while you had unsaved changes. Your version was kept and will be saved again.`,
+        });
+        return;
+      }
+      forgetDiskText(path);
+      dropPage(tabId, byName.page.id);
+      return;
+    }
+
+    const parsed = parsePage(text);
+    if (!parsed.ok) return; // half-written by a sync tool, or not a page: wait for the next change
+    const page = parsed.page;
+    const byId = tab.pages.find((p) => p.page.id === page.id);
+    const target = byName ?? byId;
+
+    if (target && unsaved(target.page.id)) {
+      set({
+        notice: `"${target.page.title}" was changed outside the app while you had unsaved changes. Your version was kept.`,
+      });
+      return;
+    }
+    if (!byName && byId && (await backend.pathExists(pagePath(tab.notesPath, byId.fileName)))) {
+      // A copy of an open page under another name (same page id): leave it alone.
+      return;
+    }
+
+    rememberDiskText(path, text);
+    if (byName && byName.page.id !== page.id) {
+      // The file now holds a different page, so the old one has gone from disk.
+      dropPage(tabId, byName.page.id);
+    }
+    const fresh = get().tabs[tabId];
+    if (fresh?.status !== "ok") return;
+    const entry: LoadedPage = {
+      fileName,
+      page,
+      readOnly: parsed.readOnly,
+      warning: parsed.warning,
+    };
+    const pages = [...fresh.pages.filter((p) => p.page.id !== page.id), entry].sort((a, b) =>
+      a.page.createdAt.localeCompare(b.page.createdAt),
+    );
+    histories.delete(page.id); // undo steps from before the reload no longer apply
+    setTab(tabId, { ...fresh, pages });
+    if (entry.readOnly && get().currentPage[tabId] === page.id) {
+      set({ save: { kind: "read-only", reason: entry.warning ?? "" } });
+    }
+    set((s) => ({ historyTick: s.historyTick + 1 }));
   }
 
   /** Adds a new page to a tab, opens it and writes its file. */
@@ -278,13 +430,16 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       try {
         const r = await loadTab(tab.folder);
         if (r.status === "missing") {
+          watchFolder(tabId, null);
           setTab(tabId, { status: "missing", notesPath: r.notesPath });
         } else {
           setTab(tabId, { status: "ok", notesPath: r.notesPath, pages: r.pages, errors: r.errors });
+          watchFolder(tabId, r.notesPath);
           if (r.errors.length) set({ notice: `Some pages could not be opened: ${r.errors[0]}` });
         }
       } catch (e) {
         set({ notice: `Could not open ${tab.name}: ${String(e)}` });
+        watchFolder(tabId, null);
         setTab(tabId, { status: "missing", notesPath: tab.folder });
       }
     },
@@ -339,38 +494,21 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       timers.delete(key);
       pending.delete(key);
       if (job) await job();
+      await inFlight.get(key)?.catch(() => undefined);
 
       const tab = get().tabs[tabId];
       if (tab?.status !== "ok") return false;
-      const index = tab.pages.findIndex((p) => p.page.id === pageId);
-      const loaded = tab.pages[index];
+      const loaded = tab.pages.find((p) => p.page.id === pageId);
       if (!loaded || loaded.readOnly) return false;
+      const path = pagePath(tab.notesPath, loaded.fileName);
       try {
-        await backend.trashPageFile(pagePath(tab.notesPath, loaded.fileName));
+        await backend.trashPageFile(path);
       } catch (e) {
         set({ notice: String(e) });
         return false;
       }
-      histories.delete(pageId);
-      const cur = get().tabs[tabId];
-      if (cur?.status !== "ok") return true;
-      const pages = cur.pages.filter((p) => p.page.id !== pageId);
-      setTab(tabId, { ...cur, pages });
-      if (get().currentPage[tabId] === pageId || pages.length === 0) {
-        const next = pages[Math.min(index, pages.length - 1)];
-        set((s) => {
-          const currentPage = { ...s.currentPage };
-          if (next) currentPage[tabId] = next.page.id;
-          else delete currentPage[tabId];
-          return { currentPage };
-        });
-        rememberLast(tabId, next?.page.id);
-        set({
-          save: next?.readOnly
-            ? { kind: "read-only", reason: next.warning ?? "" }
-            : { kind: "saved" },
-        });
-      }
+      forgetDiskText(path);
+      dropPage(tabId, pageId);
       return true;
     },
 
@@ -486,6 +624,32 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       histories.set(id, step.history);
       get().updatePage((p) => ({ ...p, elements: step.value }));
       set((s) => ({ historyTick: s.historyTick + 1 }));
+    },
+
+    async applyOutsideChanges(notesPath, fileNames, rescan = false) {
+      const tabId = Object.entries(get().tabs).find(
+        ([, t]) => t.status === "ok" && t.notesPath === notesPath,
+      )?.[0];
+      if (!tabId) return;
+      const prev = outsideQueue.get(notesPath) ?? Promise.resolve();
+      const run = prev.then(async () => {
+        if (rescan && !(await backend.pathExists(notesPath))) {
+          await get().reloadTab(tabId); // shows "Folder not found"
+          return;
+        }
+        for (const name of fileNames) {
+          try {
+            await applyOutsideFile(tabId, name);
+          } catch {
+            // One unreadable file must not stop the others.
+          }
+        }
+      });
+      outsideQueue.set(
+        notesPath,
+        run.catch(() => undefined),
+      );
+      await run;
     },
 
     async flushSaves() {

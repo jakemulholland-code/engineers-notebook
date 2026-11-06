@@ -94,6 +94,28 @@ export function App() {
     };
   }, []);
 
+  // Page files changed outside the app (OneDrive, Dropbox, another editor).
+  useEffect(() => {
+    if (!backend.isTauri) return;
+    let unlisten: (() => void) | undefined;
+    let disposed = false;
+    void import("@tauri-apps/api/event").then(async ({ listen }) => {
+      const off = await listen<{ notesPath: string; files: string[]; rescan: boolean }>(
+        "notes-changed",
+        (e) =>
+          void useNotebook
+            .getState()
+            .applyOutsideChanges(e.payload.notesPath, e.payload.files, e.payload.rescan),
+      );
+      if (disposed) off();
+      else unlisten = off;
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
+  }, []);
+
   // Global shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

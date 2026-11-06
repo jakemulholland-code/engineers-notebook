@@ -91,6 +91,12 @@ npm run e2e:m5
 npm run e2e:pages
 ```
 
+`e2e:watch` edits, adds and removes page files on disk while the app is open, as OneDrive, Dropbox or another editor would, and checks the app follows along and keeps unsaved edits. Start the app with `ENGINEERS_NOTEBOOK_APP_DIR` set to `test-fixtures\_scratch\appdata-watch`, then:
+
+```bash
+npm run e2e:watch
+```
+
 ## Export
 
 Export (toolbar button or Ctrl+Shift+E) writes Markdown, PDF or both for all tabs, one tab or the current page into a new `notebook-export-<date>` folder in the chosen destination (`-2`, `-3` and so on if one already exists, so nothing is overwritten):

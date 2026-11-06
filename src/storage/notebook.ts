@@ -9,6 +9,24 @@ export type LoadedPage = {
   warning?: string;
 };
 
+/**
+ * The exact text the app last read from or wrote to each page file, keyed by path. A watcher
+ * event whose file still holds this text came from the app itself, not from outside.
+ */
+const knownText = new Map<string, string>();
+
+export function knownDiskText(path: string): string | undefined {
+  return knownText.get(path);
+}
+
+export function rememberDiskText(path: string, text: string): void {
+  knownText.set(path, text);
+}
+
+export function forgetDiskText(path: string): void {
+  knownText.delete(path);
+}
+
 export type TabLoadResult =
   | { status: "ok"; notesPath: string; pages: LoadedPage[]; errors: string[] }
   | { status: "missing"; notesPath: string };
@@ -26,7 +44,9 @@ export async function loadTab(folder: string): Promise<TabLoadResult> {
   const errors: string[] = [];
   for (const fileName of names) {
     try {
-      const text = await backend.readTextFile(pagePath(notesPath, fileName));
+      const path = pagePath(notesPath, fileName);
+      const text = await backend.readTextFile(path);
+      rememberDiskText(path, text);
       const parsed = parsePage(text);
       if (parsed.ok) {
         pages.push({
@@ -47,5 +67,9 @@ export async function loadTab(folder: string): Promise<TabLoadResult> {
 }
 
 export async function savePage(notesPath: string, fileName: string, page: Page): Promise<void> {
-  await backend.writeTextAtomic(pagePath(notesPath, fileName), serialisePage(page));
+  const path = pagePath(notesPath, fileName);
+  const text = serialisePage(page);
+  // Remember before writing, so the watcher event for this write is recognised as ours.
+  rememberDiskText(path, text);
+  await backend.writeTextAtomic(path, text);
 }
