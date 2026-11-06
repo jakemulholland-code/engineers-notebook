@@ -13,7 +13,7 @@ Built with Tauri 2, React 18, TypeScript and Konva. See [SPEC.md](SPEC.md) for t
 | M3 Dates and Reminders | Done |
 | M4 AI | Done (tested against a local mock of each API; check each real provider with your own key) |
 | M5 Export | Done |
-| M6 Release | In progress |
+| M6 Release | Done (v0.1.0 and v0.1.1 published; in-app update from 0.1.0 to 0.1.1 tested) |
 
 ## Prerequisites
 
@@ -150,6 +150,7 @@ git push origin main --tags
 
 3. The `release` workflow builds the installer on `windows-latest`, signs the updater files and attaches everything, including `latest.json`, to a **draft** release.
 4. Check the draft, then publish it. Installed apps only see published releases.
+5. Optional: with an older version installed, `npm run e2e:update` opens it, accepts the update prompt and checks it restarts on the new version.
 
 ### Updater signing key
 
