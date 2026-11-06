@@ -8,7 +8,7 @@ import {
 } from "react";
 import { format } from "date-fns";
 import { useNotebook } from "../store/notebook";
-import { dateFromPaste, titleFromPaste, type Meeting } from "../model/meeting";
+import { dateFromPaste, notesForDisplay, titleFromPaste, type Meeting } from "../model/meeting";
 import { fromYmd, parseUkDate, toYmd } from "../reminders/dates";
 import { PlusIcon } from "../components/Icons";
 
@@ -110,10 +110,10 @@ export function MeetingsView({ tabId }: { tabId: string }) {
 }
 
 function preview(m: Meeting): string {
-  const line = m.body
+  const line = notesForDisplay(m)
     .split("\n")
     .map((l) => l.replace(/^\s*(#+|[-*]|\d+\.)\s*/, "").trim())
-    .find((l) => l && l !== m.title);
+    .find((l) => l);
   return line ? line.slice(0, 90) : "";
 }
 
@@ -190,7 +190,7 @@ function MeetingRead({
       )}
       {error && <p className="form-error">{error}</p>}
       <div className="meeting-text">
-        <NotesText text={meeting.body} />
+        <NotesText text={notesForDisplay(meeting)} />
       </div>
     </article>
   );

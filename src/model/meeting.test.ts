@@ -3,6 +3,7 @@ import {
   createMeeting,
   dateFromPaste,
   meetingFileName,
+  notesForDisplay,
   parseMeeting,
   serialiseMeeting,
   titleFromPaste,
@@ -65,6 +66,31 @@ describe("meeting files", () => {
     expect(meetingFileName(m, new Set(["2026-11-05-weekly-sync.md"]))).toBe(
       "2026-11-05-weekly-sync-2.md",
     );
+  });
+});
+
+describe("showing a meeting", () => {
+  it("hides leading lines that repeat the title and date", () => {
+    const m = {
+      title: "Weekly sync with Grade A",
+      date: "2026-11-05",
+      body: "# Weekly sync with Grade A\nThu 5 Nov 2026 · 10:00\n\n## Summary\nAgreed things.",
+    };
+    expect(notesForDisplay(m)).toBe("## Summary\nAgreed things.");
+  });
+
+  it("keeps everything when the notes start with something else", () => {
+    const m = {
+      title: "Sync",
+      date: "2026-11-05",
+      body: "## Summary\nSync went well on 5 Nov 2026",
+    };
+    expect(notesForDisplay(m)).toBe(m.body);
+  });
+
+  it("keeps a date line for a different day", () => {
+    const m = { title: "Sync", date: "2026-11-05", body: "Sync\nFollow-up on 12 Nov 2026\nMore" };
+    expect(notesForDisplay(m)).toBe("Follow-up on 12 Nov 2026\nMore");
   });
 });
 

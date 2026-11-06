@@ -110,6 +110,29 @@ export function meetingFileName(
   return name;
 }
 
+/**
+ * The notes for display, without the leading lines that only repeat what the header
+ * already shows: the title, and a short line holding the meeting's date (Granola copies
+ * start with both). The file itself keeps everything as pasted.
+ */
+export function notesForDisplay(m: Pick<Meeting, "title" | "date" | "body">): string {
+  const lines = m.body.split("\n");
+  const plain = (l: string) =>
+    l
+      .replace(/^\s*#+\s*/, "")
+      .replace(/^\*\*(.*)\*\*$/, "$1")
+      .trim();
+  let i = 0;
+  while (i < lines.length) {
+    const l = plain(lines[i]);
+    const repeatsTitle = l.toLowerCase() === m.title.trim().toLowerCase();
+    const repeatsDate = l.length > 0 && l.length <= 80 && dateFromPaste(l) === m.date;
+    if (l === "" || repeatsTitle || repeatsDate) i++;
+    else break;
+  }
+  return lines.slice(i).join("\n");
+}
+
 /** The first non-empty line of pasted notes, without Markdown heading marks, as a title. */
 export function titleFromPaste(text: string): string | undefined {
   const line = text

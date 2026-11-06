@@ -176,6 +176,17 @@ check(
   "reading view shows the notes",
   await page.isVisible(".meeting-text >> text=send the redirect map to Sam"),
 );
+const shown = (await page.textContent(".meeting-text")) ?? "";
+check(
+  "title and date lines are not repeated in the notes",
+  !shown.includes("Weekly sync with Grade A") && !shown.includes("10:00"),
+  shown.slice(0, 60),
+);
+check(
+  "list preview shows the notes, not the date",
+  ((await page.textContent(".meeting-row .meeting-preview")) ?? "").startsWith("Summary"),
+  await page.textContent(".meeting-row .meeting-preview"),
+);
 check("bold renders as bold", await page.isVisible(".meeting-text li strong >> text=Jake"));
 check(
   "switch shows the count",
