@@ -1,6 +1,6 @@
 [package]
 name = "engineers-notebook"
-version = "0.1.4"
+version = "0.1.5"
 description = "Engineer's Notebook"
 authors = ["Paramount Digital"]
 edition = "2021"
