@@ -108,7 +108,9 @@ export function currentContext(tabId: string, lookAheadDays: number): CatchUpCon
   const s = useNotebook.getState();
   const tabs = visibleTabs(s.config).flatMap((tab) => {
     const st = s.tabs[tab.id];
-    return st?.status === "ok" ? [{ tab, pages: st.pages.map((p) => p.page) }] : [];
+    return st?.status === "ok"
+      ? [{ tab, pages: st.pages.map((p) => p.page), meetings: st.meetings.map((m) => m.meeting) }]
+      : [];
   });
   return buildCatchUpContext({
     tabs,

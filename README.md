@@ -109,6 +109,12 @@ npm run e2e:tabs
 npm run e2e:move
 ```
 
+`e2e:meetings` covers meeting notes: pasting a Granola note (title and date fill in), saving to `notes/meetings`, editing, deleting, and what the AI is sent, against `scripts/mock-ai.mjs`. Start the app as for `e2e:m4` with `ENGINEERS_NOTEBOOK_APP_DIR` set to `test-fixtures/_scratch/appdata-meetings`, then:
+
+```bash
+npm run e2e:meetings
+```
+
 ## Export
 
 Export (toolbar button or Ctrl+Shift+E) writes Markdown, PDF or both for all tabs, one tab or the current page into a new `notebook-export-<date>` folder in the chosen destination (`-2`, `-3` and so on if one already exists, so nothing is overwritten):

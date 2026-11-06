@@ -24,11 +24,14 @@ import {
   knownDiskText,
   loadTab,
   rememberDiskText,
+  saveMeeting,
   savePage,
+  sortMeetings,
   type LoadedPage,
 } from "../storage/notebook";
 import { pagePath } from "../storage/paths";
 import type { ReminderIndex } from "../reminders/index";
+import { createMeeting, meetingFileName, type LoadedMeeting, type Meeting } from "../model/meeting";
 
 export const REMINDERS_CACHE_FILE = "reminders-cache.json";
 
@@ -37,7 +40,16 @@ export const AUTOSAVE_DELAY_MS = 800;
 export type TabState =
   | { status: "loading" }
   | { status: "missing"; notesPath: string }
-  | { status: "ok"; notesPath: string; pages: LoadedPage[]; errors: string[] };
+  | {
+      status: "ok";
+      notesPath: string;
+      pages: LoadedPage[];
+      /** Meeting notes, newest first. */
+      meetings: LoadedMeeting[];
+      errors: string[];
+    };
+
+export type MeetingEdit = Partial<Pick<Meeting, "title" | "date" | "body" | "includeInAi">>;
 
 export type View = { kind: "tab"; tabId: string } | { kind: "reminders" } | { kind: "empty" };
 
@@ -95,6 +107,19 @@ type NotebookStore = {
   /** Sets a page's title; the autosave renames its file to match. */
   renamePage(tabId: string, pageId: string, title: string): void;
   pageListOpen: boolean;
+  /** The open tab shows its meeting notes instead of its pages. */
+  meetingsOpen: boolean;
+  /** The meeting shown in the Meetings view. */
+  selectedMeeting: string | null;
+  showMeetings(open: boolean): void;
+  /** Opens a tab's Meetings view on one meeting (from the catch-up panel, say). */
+  openMeeting(tabId: string, meetingId: string): void;
+  /** Saves a new meeting into the tab's `notes/meetings` and selects it; returns its id. */
+  addMeeting(tabId: string, input: { title: string; date: string; body: string }): Promise<string>;
+  /** Saves changes at once, renaming the file when the date or title changes. */
+  updateMeeting(tabId: string, meetingId: string, edit: MeetingEdit): Promise<void>;
+  /** Moves the meeting's file to the Recycle Bin. */
+  deleteMeeting(tabId: string, meetingId: string): Promise<void>;
   setPageListOpen(open: boolean): void;
   goToPage(delta: number): void;
   updatePage(mutate: (p: Page) => Page): void;
@@ -545,7 +570,13 @@ export const useNotebook = create<NotebookStore>((set, get) => {
           watchFolder(tabId, null);
           setTab(tabId, { status: "missing", notesPath: r.notesPath });
         } else {
-          setTab(tabId, { status: "ok", notesPath: r.notesPath, pages: r.pages, errors: r.errors });
+          setTab(tabId, {
+            status: "ok",
+            notesPath: r.notesPath,
+            pages: r.pages,
+            meetings: r.meetings,
+            errors: r.errors,
+          });
           watchFolder(tabId, r.notesPath);
           if (r.errors.length) set({ notice: `Some pages could not be opened: ${r.errors[0]}` });
         }
@@ -557,7 +588,7 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     },
 
     openTab(tabId) {
-      set({ view: { kind: "tab", tabId }, pageListOpen: false });
+      set({ view: { kind: "tab", tabId }, pageListOpen: false, meetingsOpen: false });
       const cur = currentPageOf(get());
       rememberLast(tabId, cur?.loaded.page.id);
       const ro = cur?.loaded.readOnly;
@@ -568,7 +599,7 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     },
 
     openReminders() {
-      set({ view: { kind: "reminders" }, pageListOpen: false });
+      set({ view: { kind: "reminders" }, pageListOpen: false, meetingsOpen: false });
     },
 
     setSettingsOpen(open) {
@@ -637,6 +668,88 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       set({ pageListOpen: open });
     },
 
+    meetingsOpen: false,
+    selectedMeeting: null,
+
+    showMeetings(open) {
+      if (get().view.kind !== "tab") return;
+      set({ meetingsOpen: open, pageListOpen: false });
+    },
+
+    openMeeting(tabId, meetingId) {
+      set({
+        view: { kind: "tab", tabId },
+        meetingsOpen: true,
+        pageListOpen: false,
+        selectedMeeting: meetingId,
+      });
+      rememberLast(tabId, get().currentPage[tabId]);
+    },
+
+    async addMeeting(tabId, input) {
+      const tab = get().tabs[tabId];
+      if (tab?.status !== "ok") throw new Error("This tab's notes folder cannot be found.");
+      const meeting = createMeeting(input);
+      const fileName = meetingFileName(meeting, new Set(tab.meetings.map((m) => m.fileName)));
+      await saveMeeting(tab.notesPath, fileName, meeting);
+      const cur = get().tabs[tabId];
+      if (cur?.status === "ok") {
+        setTab(tabId, { ...cur, meetings: sortMeetings([...cur.meetings, { fileName, meeting }]) });
+      }
+      set({ selectedMeeting: meeting.id });
+      return meeting.id;
+    },
+
+    async updateMeeting(tabId, meetingId, edit) {
+      const tab = get().tabs[tabId];
+      if (tab?.status !== "ok") throw new Error("This tab's notes folder cannot be found.");
+      const loaded = tab.meetings.find((m) => m.meeting.id === meetingId);
+      if (!loaded) return;
+      const next: Meeting = {
+        ...loaded.meeting,
+        ...edit,
+        title: (edit.title ?? loaded.meeting.title).trim() || "Meeting",
+        // A file dropped in by hand gets a proper id the first time it is saved.
+        id: loaded.meeting.id.startsWith("file:") ? newId() : loaded.meeting.id,
+        updatedAt: new Date().toISOString(),
+      };
+      const others = new Set(tab.meetings.filter((m) => m !== loaded).map((m) => m.fileName));
+      const stem = (n: string) => n.replace(/(-\d+)?\.md$/i, "");
+      let fileName = loaded.fileName;
+      if (stem(meetingFileName(next, new Set())) !== stem(loaded.fileName)) {
+        fileName = meetingFileName(next, others);
+        await backend.renameMeetingFile(tab.notesPath, loaded.fileName, fileName);
+      }
+      await saveMeeting(tab.notesPath, fileName, next);
+      const cur = get().tabs[tabId];
+      if (cur?.status === "ok") {
+        setTab(tabId, {
+          ...cur,
+          meetings: sortMeetings(
+            cur.meetings.map((m) => (m.meeting.id === meetingId ? { fileName, meeting: next } : m)),
+          ),
+        });
+      }
+      if (get().selectedMeeting === meetingId) set({ selectedMeeting: next.id });
+    },
+
+    async deleteMeeting(tabId, meetingId) {
+      const tab = get().tabs[tabId];
+      if (tab?.status !== "ok") return;
+      const index = tab.meetings.findIndex((m) => m.meeting.id === meetingId);
+      if (index < 0) return;
+      await backend.trashMeetingFile(tab.notesPath, tab.meetings[index].fileName);
+      const cur = get().tabs[tabId];
+      if (cur?.status !== "ok") return;
+      const meetings = cur.meetings.filter((m) => m.meeting.id !== meetingId);
+      setTab(tabId, { ...cur, meetings });
+      if (get().selectedMeeting === meetingId) {
+        set({
+          selectedMeeting: meetings[Math.min(index, meetings.length - 1)]?.meeting.id ?? null,
+        });
+      }
+    },
+
     goToPage(delta) {
       const cur = currentPageOf(get());
       if (!cur) return;
@@ -682,6 +795,7 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     openPageAt(tabId, pageId, elementId) {
       set((s) => ({
         view: { kind: "tab", tabId },
+        meetingsOpen: false,
         currentPage: { ...s.currentPage, [tabId]: pageId },
         flash: elementId ? { elementId, nonce: Date.now() } : null,
       }));

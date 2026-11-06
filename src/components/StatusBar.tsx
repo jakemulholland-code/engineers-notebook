@@ -51,6 +51,11 @@ export function StatusBar() {
   const general = useNotebook((s) => s.config.general);
   const zoom = useTools((s) => s.zoom);
   const view = useNotebook((s) => s.view);
+  const meetingsOpen = useNotebook((s) => s.meetingsOpen);
+  const showMeetings = useNotebook((s) => s.showMeetings);
+  const tabState = useNotebook((s) => (s.view.kind === "tab" ? s.tabs[s.view.tabId] : undefined));
+  const tabOk = tabState?.status === "ok";
+  const meetingCount = tabState?.status === "ok" ? tabState.meetings.length : 0;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -60,7 +65,17 @@ export function StatusBar() {
 
   return (
     <footer className="statusbar">
-      {cur && (
+      {tabOk && (
+        <div className="view-switch" role="group" aria-label="Show">
+          <button aria-pressed={!meetingsOpen} onClick={() => showMeetings(false)}>
+            Pages
+          </button>
+          <button aria-pressed={meetingsOpen} onClick={() => showMeetings(true)}>
+            Meetings{meetingCount ? ` (${meetingCount})` : ""}
+          </button>
+        </div>
+      )}
+      {cur && !meetingsOpen && (
         <div className="pager">
           <button
             className="icon-button small"
@@ -100,7 +115,7 @@ export function StatusBar() {
       )}
       {view.kind === "reminders" ? (
         <RemindersCount />
-      ) : (
+      ) : meetingsOpen ? null : (
         <span>
           {general.lockToGrid ? `Snapping to ${general.gridSize} px grid` : "Grid snapping off"}
         </span>
@@ -109,9 +124,9 @@ export function StatusBar() {
         className={`push ${save.kind === "error" ? "error" : ""}`}
         title={save.kind === "error" ? save.message : undefined}
       >
-        {cur ? saveLabel(save, now) : ""}
+        {cur && !meetingsOpen ? saveLabel(save, now) : ""}
       </span>
-      <span>{Math.round(zoom * 100)}%</span>
+      {!meetingsOpen && <span>{Math.round(zoom * 100)}%</span>}
       <PageList />
     </footer>
   );

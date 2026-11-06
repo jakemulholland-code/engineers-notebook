@@ -43,6 +43,8 @@ export function startMockAi(port = 9455) {
 
   function replyFor(system, userText) {
     if (/connection test/i.test(system)) return "OK";
+    // A test supplies the answer: setMode({ kind: "reply", fn: (system, userText) => "..." }).
+    if (mode.kind === "reply") return mode.fn(system, userText);
     if (mode.kind === "garbage") return "I'm sorry, here is a summary in prose rather than JSON.";
     if (system.includes("<notes>")) {
       const first = system.match(/\[(r\d+)\] (?:Due|Follow up)/);

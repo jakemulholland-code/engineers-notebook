@@ -11,6 +11,7 @@ import { currentPageOf, useNotebook } from "../store/notebook";
 import { TOOL_KEYS, useTools } from "../store/tools";
 import { usePersistReminderCache } from "../reminders/useReminders";
 import { RemindersView } from "./RemindersView";
+import { MeetingsView } from "./MeetingsView";
 import { CatchUpPanel } from "../components/CatchUpPanel";
 import { ExportDialog, useExportDialog } from "../components/ExportDialog";
 import { useUpdates } from "./updates";
@@ -192,6 +193,7 @@ function MainView() {
   const openSettings = useNotebook((s) => s.setSettingsOpen);
   const newPage = useNotebook((s) => s.newPage);
   const updatePage = useNotebook((s) => s.updatePage);
+  const meetingsOpen = useNotebook((s) => s.meetingsOpen);
   const cur = useNotebook(useShallow(currentPageOf));
 
   let content: ReactNode;
@@ -242,6 +244,8 @@ function MainView() {
           </div>
         </div>
       );
+    } else if (meetingsOpen) {
+      content = <MeetingsView tabId={view.tabId} />;
     } else if (!cur) {
       content = (
         <div className="empty-state">

@@ -267,6 +267,78 @@ pub fn list_page_files(notes_path: String) -> Result<Vec<String>, String> {
     Ok(out)
 }
 
+/// File names of every `*.md` in `<notes>/meetings`; none if the folder does not exist yet.
+#[tauri::command]
+pub fn list_meeting_files(notes_path: String) -> Result<Vec<String>, String> {
+    let meetings = Path::new(&notes_path).join("meetings");
+    if !meetings.is_dir() {
+        return Ok(vec![]);
+    }
+    let mut out: Vec<String> = fs::read_dir(&meetings)
+        .map_err(err)?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().map(|t| t.is_file()).unwrap_or(false))
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|n| n.to_lowercase().ends_with(".md") && !n.starts_with('.'))
+        .collect();
+    out.sort();
+    Ok(out)
+}
+
+/// A plain `name.md`: no folders, no leading dot.
+fn is_meeting_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.to_lowercase().ends_with(".md")
+        && !name.starts_with('.')
+        && !name.contains(['/', '\\', ':'])
+}
+
+/// Writes a meeting file into this app's `<notes>/meetings`, creating that folder if needed.
+pub fn write_meeting_in(notes: &Path, file_name: &str, contents: &str) -> Result<(), String> {
+    if !is_meeting_name(file_name) {
+        return Err(format!("Not a meeting file name: {file_name}"));
+    }
+    if !is_our_notebook(notes) {
+        return Err(format!("{} is not a notes folder made by this app.", notes.display()));
+    }
+    let dir = notes.join("meetings");
+    fs::create_dir_all(&dir).map_err(err)?;
+    atomic_write(&dir.join(file_name), contents.as_bytes())
+}
+
+#[tauri::command]
+pub fn write_meeting_file(notes_path: String, file_name: String, contents: String) -> Result<(), String> {
+    write_meeting_in(Path::new(&notes_path), &file_name, &contents)
+}
+
+/// Renames a meeting file inside `<notes>/meetings`, never overwriting.
+#[tauri::command]
+pub fn rename_meeting_file(notes_path: String, from: String, to: String) -> Result<(), String> {
+    if !is_meeting_name(&from) || !is_meeting_name(&to) {
+        return Err("Not a meeting file name.".into());
+    }
+    let dir = Path::new(&notes_path).join("meetings");
+    rename_no_clobber(&dir.join(from), &dir.join(to))
+}
+
+/// Deletes a meeting by moving its file (and `.bak`) to the Recycle Bin.
+#[tauri::command]
+pub fn trash_meeting_file(notes_path: String, file_name: String) -> Result<(), String> {
+    if !is_meeting_name(&file_name) {
+        return Err(format!("Not a meeting file name: {file_name}"));
+    }
+    let path = Path::new(&notes_path).join("meetings").join(&file_name);
+    if !path.is_file() {
+        return Err(format!("File not found: {}", path.display()));
+    }
+    trash::delete(&path).map_err(|e| format!("Could not move the meeting to the Recycle Bin: {e}"))?;
+    let bak = PathBuf::from(format!("{}.bak", path.display()));
+    if bak.is_file() {
+        let _ = trash::delete(&bak);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn read_text_file(path: String) -> Result<String, String> {
     fs::read_to_string(path).map_err(err)
@@ -343,6 +415,36 @@ pub fn open_in_explorer(app: tauri::AppHandle, path: String) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn meeting_files_stay_in_our_meetings_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let folder = dir.path().join("Client");
+        fs::create_dir_all(&folder).unwrap();
+        prepare_folder(&folder, "Client", "#01C6A3", false).unwrap();
+        let notes = folder.join("notes");
+        let np = notes.to_string_lossy().to_string();
+
+        assert_eq!(list_meeting_files(np.clone()).unwrap(), Vec::<String>::new());
+        write_meeting_in(&notes, "2026-11-05-sync.md", "---\nid: \"a\"\n---\n\nHi\n").unwrap();
+        write_meeting_in(&notes, "2026-11-05-sync.md", "second").unwrap();
+        assert_eq!(fs::read_to_string(notes.join("meetings/2026-11-05-sync.md")).unwrap(), "second");
+        assert!(notes.join("meetings/2026-11-05-sync.md.bak").exists());
+        fs::write(notes.join("meetings/notes.txt"), "x").unwrap();
+        assert_eq!(list_meeting_files(np.clone()).unwrap(), vec!["2026-11-05-sync.md"]);
+
+        for bad in ["../x.md", "sub/x.md", "x.txt", ".hidden.md", "C:x.md", ""] {
+            assert!(write_meeting_in(&notes, bad, "x").is_err(), "{bad}");
+        }
+        let foreign = dir.path().join("Other").join("notes");
+        fs::create_dir_all(&foreign).unwrap();
+        assert!(write_meeting_in(&foreign, "a.md", "x").is_err());
+        assert!(!foreign.join("meetings").exists());
+
+        rename_meeting_file(np.clone(), "2026-11-05-sync.md".into(), "2026-11-05-weekly.md".into()).unwrap();
+        assert!(notes.join("meetings/2026-11-05-weekly.md").exists());
+        assert!(rename_meeting_file(np, "2026-11-05-weekly.md".into(), "../x.md".into()).is_err());
+    }
 
     #[test]
     fn notebook_meta_updates_only_our_file() {

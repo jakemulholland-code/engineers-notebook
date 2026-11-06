@@ -36,6 +36,12 @@ export interface Backend {
   writeTextAtomic(path: string, contents: string): Promise<void>;
   /** Renames a file; fails if the target exists. */
   renameFile(from: string, to: string): Promise<void>;
+  /** Meeting notes: `*.md` files in `<notes>/meetings` (the folder is made on first save). */
+  listMeetingFiles(notesPath: string): Promise<string[]>;
+  writeMeetingFile(notesPath: string, fileName: string, contents: string): Promise<void>;
+  renameMeetingFile(notesPath: string, from: string, to: string): Promise<void>;
+  /** Moves a meeting file to the Recycle Bin. */
+  trashMeetingFile(notesPath: string, fileName: string): Promise<void>;
   /** Moves a page file (and its `.bak`) to the Recycle Bin. Never a hard delete. */
   trashPageFile(path: string): Promise<void>;
   openInExplorer(path: string): Promise<void>;
@@ -79,6 +85,12 @@ const tauriBackend: Backend = {
   writeTextAtomic: (path, contents) => invoke("write_text_atomic", { path, contents }),
   renameFile: (from, to) => invoke("rename_file", { from, to }),
   trashPageFile: (path) => invoke("trash_page_file", { path }),
+  listMeetingFiles: (notesPath) => invoke<string[]>("list_meeting_files", { notesPath }),
+  writeMeetingFile: (notesPath, fileName, contents) =>
+    invoke("write_meeting_file", { notesPath, fileName, contents }),
+  renameMeetingFile: (notesPath, from, to) =>
+    invoke("rename_meeting_file", { notesPath, from, to }),
+  trashMeetingFile: (notesPath, fileName) => invoke("trash_meeting_file", { notesPath, fileName }),
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
   moveNotes: (fromNotes, toFolder) =>
     invoke<MoveNotesResult>("move_notes", { fromNotes, toFolder }),
@@ -156,6 +168,29 @@ function createMemoryBackend(): Backend {
       if (v === undefined) throw new Error(`File not found: ${from}`);
       files.delete(from);
       files.set(to, v);
+    },
+    listMeetingFiles: async (notesPath) =>
+      [...files.keys()]
+        .filter((k) => k.startsWith(`${notesPath}/meetings/`) && k.toLowerCase().endsWith(".md"))
+        .map((k) => k.slice(`${notesPath}/meetings/`.length))
+        .sort(),
+    writeMeetingFile: async (notesPath, fileName, contents) => {
+      if (!dirs.has(notesPath)) throw new Error(`Folder not found: ${notesPath}`);
+      files.set(`${notesPath}/meetings/${fileName}`, contents);
+    },
+    renameMeetingFile: async (notesPath, from, to) => {
+      const a = `${notesPath}/meetings/${from}`;
+      const b = `${notesPath}/meetings/${to}`;
+      if (files.has(b)) throw new Error(`A file named ${b} already exists`);
+      const v = files.get(a);
+      if (v === undefined) throw new Error(`File not found: ${a}`);
+      files.delete(a);
+      files.set(b, v);
+    },
+    trashMeetingFile: async (notesPath, fileName) => {
+      const p = `${notesPath}/meetings/${fileName}`;
+      if (!files.has(p)) throw new Error(`File not found: ${p}`);
+      files.delete(p);
     },
     // Browser preview has no Recycle Bin; the in-memory files simply go.
     trashPageFile: async (p) => {

@@ -189,19 +189,39 @@ function useRefChip() {
   const config = useNotebook((s) => s.config);
   const tabsState = useNotebook((s) => s.tabs);
   const openPageAt = useNotebook((s) => s.openPageAt);
+  const openMeeting = useNotebook((s) => s.openMeeting);
   return (ref: Ref | undefined) => {
     if (!ref) return null;
     const tab = config.tabs.find((t) => t.id === ref.tabId);
     const st = tabsState[ref.tabId];
-    const exists = st?.status === "ok" && st.pages.some((p) => p.page.id === ref.pageId);
-    const pageTitle =
-      st?.status === "ok" ? st.pages.find((p) => p.page.id === ref.pageId)?.page.title : undefined;
+    if (ref.meetingId !== undefined) {
+      const meetingId = ref.meetingId;
+      const meeting =
+        st?.status === "ok" ? st.meetings.find((m) => m.meeting.id === meetingId) : undefined;
+      return (
+        <button
+          className="source-chip"
+          disabled={!meeting}
+          title={
+            meeting
+              ? `Open the meeting "${meeting.meeting.title}"`
+              : "That meeting is no longer there"
+          }
+          onClick={() => openMeeting(ref.tabId, meetingId)}
+        >
+          <span aria-hidden="true" style={{ background: tab?.colour }} />
+          {tab?.name ?? "Unknown tab"} meeting
+        </button>
+      );
+    }
+    const pageId = ref.pageId;
+    const page = st?.status === "ok" ? st.pages.find((p) => p.page.id === pageId) : undefined;
     return (
       <button
         className="source-chip"
-        disabled={!exists}
-        title={exists ? `Open ${pageTitle || "page"}` : "That page is no longer there"}
-        onClick={() => openPageAt(ref.tabId, ref.pageId, ref.elementId)}
+        disabled={!page}
+        title={page ? `Open ${page.page.title || "page"}` : "That page is no longer there"}
+        onClick={() => openPageAt(ref.tabId, pageId, ref.elementId)}
       >
         <span aria-hidden="true" style={{ background: tab?.colour }} />
         {tab?.name ?? "Unknown tab"}
@@ -253,6 +273,7 @@ function SummaryView() {
         edited page
         {st.recentPages === 1 ? "" : "s"} and {st.stalePages} page{st.stalePages === 1 ? "" : "s"}{" "}
         left untouched.
+        {st.meetings ? ` Read ${st.meetings} meeting${st.meetings === 1 ? "" : "s"} in full.` : ""}
         {st.truncated ? " Long notes were cut short to fit." : ""}
         {typeof saved.snapshots === "number" && saved.snapshots > 0
           ? ` Included ${saved.snapshots} page snapshot${saved.snapshots === 1 ? "" : "s"}.`

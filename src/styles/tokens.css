@@ -43,6 +43,10 @@
   --chip-hover: rgba(233, 237, 253, 0.1);
   --chip-active: rgba(233, 237, 253, 0.14);
   --tab-idle: rgba(233, 237, 253, 0.07);
+  /* Desk colour laid over the paper grid (Meetings list and reading panel). */
+  --desk-veil: rgba(12, 19, 50, 0.55);
+  --desk-veil-hover: rgba(12, 19, 50, 0.8);
+  --desk-panel: rgba(12, 19, 50, 0.72);
   --shadow-popover: 0 18px 40px rgba(4, 8, 24, 0.55);
 
   /* Printer-friendly export: white paper, light blue grid, dark ink.
