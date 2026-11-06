@@ -163,7 +163,7 @@ pub struct PrepareResult {
     pub notes_path: String,
 }
 
-fn is_our_notebook(notes: &Path) -> bool {
+pub fn is_our_notebook(notes: &Path) -> bool {
     let Ok(text) = fs::read_to_string(notes.join("notebook.json")) else {
         return false;
     };

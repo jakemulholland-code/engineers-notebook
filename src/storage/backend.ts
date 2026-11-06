@@ -7,6 +7,14 @@ import { invoke } from "@tauri-apps/api/core";
  */
 export type PrepareStatus = "created" | "existing" | "foreign";
 export type PrepareResult = { status: PrepareStatus; notesPath: string };
+export type MoveNotesResult = {
+  /** `<new folder>/notes` */
+  notesPath: string;
+  /** Files copied and verified. */
+  files: number;
+  /** Why the old notes folder could not go to the Recycle Bin, if it could not. */
+  oldLeftBehind: string | null;
+};
 
 export interface Backend {
   readonly isTauri: boolean;
@@ -31,6 +39,11 @@ export interface Backend {
   /** Moves a page file (and its `.bak`) to the Recycle Bin. Never a hard delete. */
   trashPageFile(path: string): Promise<void>;
   openInExplorer(path: string): Promise<void>;
+  /**
+   * Copies a notes folder into `<toFolder>/notes`, verifies every file, then moves the old
+   * folder to the Recycle Bin. On any failure before that, the original is untouched.
+   */
+  moveNotes(fromNotes: string, toFolder: string): Promise<MoveNotesResult>;
   /** Keeps the name and colour in this app's `notebook.json` in step (other apps' files are left alone). */
   updateNotebookMeta(notesPath: string, name: string, colour: string): Promise<void>;
   /** Starts watching `<notes>/pages`; changes arrive as `notes-changed` events. */
@@ -67,6 +80,8 @@ const tauriBackend: Backend = {
   renameFile: (from, to) => invoke("rename_file", { from, to }),
   trashPageFile: (path) => invoke("trash_page_file", { path }),
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
+  moveNotes: (fromNotes, toFolder) =>
+    invoke<MoveNotesResult>("move_notes", { fromNotes, toFolder }),
   updateNotebookMeta: (notesPath, name, colour) =>
     invoke("update_notebook_meta", { notesPath, name, colour }),
   watchNotesFolder: (notesPath) => invoke("watch_notes_folder", { notesPath }),
@@ -82,6 +97,12 @@ const tauriBackend: Backend = {
   saveKey: (provider, key) => invoke<string>("save_key", { provider, key }),
   removeKey: (provider) => invoke("remove_key", { provider }),
   chooseFolder: async (title) => {
+    // Dev builds only: end-to-end scripts queue answers here, because the native picker
+    // cannot be driven over the debugging port. Release builds compile this out.
+    if (import.meta.env.DEV) {
+      const queue = (window as { __e2eFolders?: string[] }).__e2eFolders;
+      if (queue?.length) return queue.shift() ?? null;
+    }
     const { open } = await import("@tauri-apps/plugin-dialog");
     const r = await open({ directory: true, multiple: false, title });
     return typeof r === "string" ? r : null;
@@ -144,6 +165,31 @@ function createMemoryBackend(): Backend {
     },
     openInExplorer: async () => undefined,
     updateNotebookMeta: async () => undefined,
+    // Browser preview: moves the in-memory files (there is no Recycle Bin to use).
+    moveNotes: async (fromNotes, toFolder) => {
+      const toNotes = `${toFolder}/notes`;
+      if ([...files.keys()].some((k) => k.startsWith(`${toNotes}/`))) {
+        throw new Error(`${toNotes} already exists and is not empty.`);
+      }
+      const moving = [...files.keys()].filter((k) => k.startsWith(`${fromNotes}/`));
+      for (const k of moving) {
+        files.set(toNotes + k.slice(fromNotes.length), files.get(k) as string);
+        files.delete(k);
+      }
+      for (const [k, v] of [...assets]) {
+        if (!k.startsWith(`${fromNotes}/`)) continue;
+        assets.set(toNotes + k.slice(fromNotes.length), v);
+        assets.delete(k);
+      }
+      for (const d of [...dirs]) {
+        if (d === fromNotes || d.startsWith(`${fromNotes}/`)) {
+          dirs.delete(d);
+          dirs.add(toNotes + d.slice(fromNotes.length));
+        }
+      }
+      dirs.add(toFolder);
+      return { notesPath: toNotes, files: moving.length, oldLeftBehind: null };
+    },
     // Nothing changes outside the app in the browser preview.
     watchNotesFolder: async () => undefined,
     unwatchNotesFolder: async () => undefined,

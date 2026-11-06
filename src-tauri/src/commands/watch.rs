@@ -19,6 +19,15 @@ pub struct WatchState {
     watchers: Mutex<HashMap<String, Debouncer<RecommendedWatcher>>>,
 }
 
+impl WatchState {
+    /// Stops watching a notes folder. Windows will not move a folder that is being watched.
+    pub fn stop(&self, notes_path: &str) {
+        if let Ok(mut watchers) = self.watchers.lock() {
+            watchers.remove(notes_path);
+        }
+    }
+}
+
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct NotesChanged {
@@ -85,9 +94,7 @@ pub fn watch_notes_folder(
 
 #[tauri::command]
 pub fn unwatch_notes_folder(state: State<'_, WatchState>, notes_path: String) {
-    if let Ok(mut watchers) = state.watchers.lock() {
-        watchers.remove(&notes_path);
-    }
+    state.stop(&notes_path);
 }
 
 #[cfg(test)]

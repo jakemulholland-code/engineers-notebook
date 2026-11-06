@@ -67,6 +67,12 @@ type NotebookStore = {
     notesPath: string;
   }): Promise<void>;
   changeFolder(tabId: string, folder: string, notesPath: string): Promise<void>;
+  /**
+   * "Move existing notes": saves pending edits, copies the tab's notes folder into
+   * `<folder>/notes`, verifies it, bins the old copy and points the tab at the new folder.
+   * Throws (with the original untouched) if the move cannot be done safely.
+   */
+  moveNotes(tabId: string, folder: string): Promise<void>;
   /** Renames a tab (and its `notebook.json`). Blank names are ignored. */
   renameTab(tabId: string, name: string): Promise<void>;
   setTabColour(tabId: string, colour: string): Promise<void>;
@@ -432,6 +438,28 @@ export const useNotebook = create<NotebookStore>((set, get) => {
       await get().reloadTab(id);
       void notesPath;
       get().openTab(id);
+    },
+
+    async moveNotes(tabId, folder) {
+      const state = get().tabs[tabId];
+      if (state?.status !== "ok") throw new Error("The current notes folder cannot be found.");
+      await get().flushSaves();
+      // Windows will not move a folder that is being watched.
+      watchFolder(tabId, null);
+      let r;
+      try {
+        r = await backend.moveNotes(state.notesPath, folder);
+      } catch (e) {
+        watchFolder(tabId, state.notesPath);
+        throw e;
+      }
+      await get().changeFolder(tabId, folder, r.notesPath);
+      const files = r.files === 1 ? "1 file" : `${r.files} files`;
+      set({
+        notice: r.oldLeftBehind
+          ? `Moved and checked ${files} in ${r.notesPath}. The old notes folder could not go to the Recycle Bin (${r.oldLeftBehind}); delete ${state.notesPath} yourself once you have checked the new one.`
+          : `Moved and checked ${files} in ${r.notesPath}. The old notes folder is in the Recycle Bin.`,
+      });
     },
 
     async renameTab(tabId, name) {

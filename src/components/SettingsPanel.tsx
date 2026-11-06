@@ -83,10 +83,26 @@ function ClientsSection() {
   const onMove = useCallback((id: string, slot: number) => void moveTab(id, slot), [moveTab]);
   const { listRef, drag, start, onClickCapture, dropMark } = useDragReorder<HTMLDivElement>(onMove);
 
+  const [changing, setChanging] = useState<Changing | null>(null);
+
   async function onChangeFolder(t: TabConfig) {
     setError(null);
+    setChanging(null);
     const folder = await backend.chooseFolder(`Choose a new folder for ${t.name}`);
     if (!folder) return;
+    const norm = (p: string) => p.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
+    if (norm(folder) === norm(t.folder)) {
+      setError(`${t.name} already uses that folder.`);
+      return;
+    }
+    const hasNotes = await backend.pathExists(notesPathFor(folder));
+    const canMove = tabs[t.id]?.status === "ok";
+    setChanging({ tab: t, folder, hasNotes, canMove });
+  }
+
+  /** "Point at the new folder only": the existing notes stay where they are. */
+  async function pointAt(t: TabConfig, folder: string) {
+    setError(null);
     try {
       const r = await backend.prepareClientFolder(folder, t.name, t.colour, false);
       if (
@@ -99,6 +115,7 @@ function ClientsSection() {
       }
       if (r.status === "foreign") await backend.prepareClientFolder(folder, t.name, t.colour, true);
       await changeFolder(t.id, folder, r.notesPath);
+      setChanging(null);
     } catch (e) {
       setError(String(e));
     }
@@ -205,6 +222,15 @@ function ClientsSection() {
         })}
       </div>
 
+      {changing && (
+        <ChangeFolderCard
+          key={`${changing.tab.id}:${changing.folder}`}
+          changing={changing}
+          onPoint={() => pointAt(changing.tab, changing.folder)}
+          onDone={() => setChanging(null)}
+        />
+      )}
+
       {error && <p className="form-error">{error}</p>}
 
       {archived.length > 0 && (
@@ -241,6 +267,112 @@ function ClientsSection() {
         </button>
       )}
     </>
+  );
+}
+
+type Changing = { tab: TabConfig; folder: string; hasNotes: boolean; canMove: boolean };
+
+/** Change folder: move the existing notes across, or just point the tab at the new folder. */
+function ChangeFolderCard({
+  changing,
+  onPoint,
+  onDone,
+}: {
+  changing: Changing;
+  onPoint(): Promise<void>;
+  onDone(): void;
+}) {
+  const { tab, folder, hasNotes, canMove } = changing;
+  const [mode, setMode] = useState<"move" | "point">(canMove && !hasNotes ? "move" : "point");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const oldNotes = notesPathFor(tab.folder);
+  const newNotes = notesPathFor(folder);
+
+  async function confirm() {
+    setBusy(true);
+    setError(null);
+    try {
+      if (mode === "move") {
+        await useNotebook.getState().moveNotes(tab.id, folder);
+        onDone();
+      } else {
+        await onPoint();
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      className="form-card change-folder"
+      aria-label={`Change folder for ${tab.name}`}
+      onSubmit={(e) => {
+        e.preventDefault();
+        void confirm();
+      }}
+    >
+      <h3>Change folder for {tab.name}</h3>
+      <p className="lead">
+        New folder: <span className="path-preview">{folder}</span>
+      </p>
+      <fieldset className="choices" disabled={busy}>
+        <legend className="visually-hidden">What to do with the existing notes</legend>
+        <label className={canMove ? "" : "disabled"}>
+          <input
+            type="radio"
+            name="change-folder"
+            checked={mode === "move"}
+            disabled={!canMove}
+            onChange={() => setMode("move")}
+          />
+          <span>
+            <strong>Move existing notes</strong>
+            <span className="hint">
+              {canMove
+                ? `Copies ${oldNotes} to ${newNotes}, checks every file, then moves the old folder to the Recycle Bin.`
+                : "The current notes folder cannot be found, so there is nothing to move."}
+              {canMove && hasNotes
+                ? " The new folder already has a notes folder; moving only works if it is empty."
+                : ""}
+            </span>
+          </span>
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="change-folder"
+            checked={mode === "point"}
+            onChange={() => setMode("point")}
+          />
+          <span>
+            <strong>Point at the new folder only</strong>
+            <span className="hint">
+              {hasNotes
+                ? `Opens the notes already in ${newNotes}. The current notes stay where they are.`
+                : `Starts an empty notes folder in ${newNotes}. The current notes stay where they are.`}
+            </span>
+          </span>
+        </label>
+      </fieldset>
+      {busy && mode === "move" && (
+        <p className="lead" role="status">
+          Moving and checking notes…
+        </p>
+      )}
+      {error && <p className="form-error">{error}</p>}
+      <div className="form-actions">
+        <button type="button" className="pill ghost" onClick={onDone} disabled={busy}>
+          Cancel
+        </button>
+        <button type="submit" className="pill primary" disabled={busy}>
+          {mode === "move" ? "Move notes" : "Change folder"}
+        </button>
+      </div>
+    </form>
   );
 }
 

@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{ai, assets, export, fs, keychain, watch};
+use commands::{ai, assets, export, fs, keychain, move_notes, watch};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -48,6 +48,7 @@ pub fn run() {
             fs::open_in_explorer,
             fs::trash_page_file,
             fs::update_notebook_meta,
+            move_notes::move_notes,
             watch::watch_notes_folder,
             watch::unwatch_notes_folder,
             fs::open_app_dir,

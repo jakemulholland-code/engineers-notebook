@@ -19,6 +19,7 @@
     "e2e:pages": "node scripts/e2e-pages.mjs",
     "e2e:watch": "node scripts/e2e-watch.mjs",
     "e2e:tabs": "node scripts/e2e-tabs.mjs",
+    "e2e:move": "node scripts/e2e-move.mjs",
     "e2e:update": "node scripts/e2e-update.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."

@@ -103,6 +103,12 @@ npm run e2e:watch
 npm run e2e:tabs
 ```
 
+`e2e:move` covers Change folder: moving existing notes (every file checked, the old folder in the Recycle Bin), refusing a folder that already has notes, and pointing at a new folder only. The native folder picker cannot be driven by the script, so dev builds answer it from `window.__e2eFolders`. Start the app with `ENGINEERS_NOTEBOOK_APP_DIR` set to `test-fixtures\_scratch\appdata-move`, then:
+
+```bash
+npm run e2e:move
+```
+
 ## Export
 
 Export (toolbar button or Ctrl+Shift+E) writes Markdown, PDF or both for all tabs, one tab or the current page into a new `notebook-export-<date>` folder in the chosen destination (`-2`, `-3` and so on if one already exists, so nothing is overwritten):
