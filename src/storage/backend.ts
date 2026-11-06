@@ -28,6 +28,8 @@ export interface Backend {
   writeTextAtomic(path: string, contents: string): Promise<void>;
   /** Renames a file; fails if the target exists. */
   renameFile(from: string, to: string): Promise<void>;
+  /** Moves a page file (and its `.bak`) to the Recycle Bin. Never a hard delete. */
+  trashPageFile(path: string): Promise<void>;
   openInExplorer(path: string): Promise<void>;
   /** Saves PNG bytes (base64) into `<notes>/assets`, de-duplicated; returns `assets/<sha256>.png`. */
   saveAsset(notesPath: string, pngBase64: string): Promise<string>;
@@ -58,6 +60,7 @@ const tauriBackend: Backend = {
   readTextFile: (path) => invoke<string>("read_text_file", { path }),
   writeTextAtomic: (path, contents) => invoke("write_text_atomic", { path, contents }),
   renameFile: (from, to) => invoke("rename_file", { from, to }),
+  trashPageFile: (path) => invoke("trash_page_file", { path }),
   openInExplorer: (path) => invoke("open_in_explorer", { path }),
   saveAsset: (notesPath, dataBase64) => invoke<string>("save_asset", { notesPath, dataBase64 }),
   readAsset: (notesPath, rel) => invoke<ArrayBuffer>("read_asset", { notesPath, rel }),
@@ -123,6 +126,12 @@ function createMemoryBackend(): Backend {
       if (v === undefined) throw new Error(`File not found: ${from}`);
       files.delete(from);
       files.set(to, v);
+    },
+    // Browser preview has no Recycle Bin; the in-memory files simply go.
+    trashPageFile: async (p) => {
+      if (!files.has(p)) throw new Error(`File not found: ${p}`);
+      files.delete(p);
+      files.delete(`${p}.bak`);
     },
     openInExplorer: async () => undefined,
     saveAsset: async (notesPath, b64) => {

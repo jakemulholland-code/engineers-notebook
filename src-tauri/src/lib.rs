@@ -45,6 +45,7 @@ pub fn run() {
             fs::write_text_atomic,
             fs::rename_file,
             fs::open_in_explorer,
+            fs::trash_page_file,
             fs::open_app_dir,
             fs::backup_config,
             assets::save_asset,

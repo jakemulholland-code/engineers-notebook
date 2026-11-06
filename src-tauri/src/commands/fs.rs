@@ -270,6 +270,41 @@ pub fn rename_file(from: String, to: String) -> Result<(), String> {
     rename_no_clobber(Path::new(&from), Path::new(&to))
 }
 
+/// Only a `*.page.json` file directly inside `<notes>/pages` may be moved to the bin.
+pub fn check_page_file(path: &Path) -> Result<(), String> {
+    use std::path::Component;
+    let bad = || format!("Not a page file: {}", path.display());
+    if path.components().any(|c| matches!(c, Component::ParentDir | Component::CurDir)) {
+        return Err(bad());
+    }
+    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let pages = path.parent();
+    let notes = pages.and_then(Path::parent);
+    let named = |p: Option<&Path>, want: &str| {
+        p.and_then(Path::file_name).map(|n| n == want).unwrap_or(false)
+    };
+    if !name.ends_with(".page.json") || !named(pages, "pages") || !named(notes, "notes") {
+        return Err(bad());
+    }
+    if !path.is_file() {
+        return Err(format!("File not found: {}", path.display()));
+    }
+    Ok(())
+}
+
+/// Deletes a page by moving it, and its `.bak`, to the Recycle Bin. Never a hard delete.
+#[tauri::command]
+pub fn trash_page_file(path: String) -> Result<(), String> {
+    let p = Path::new(&path);
+    check_page_file(p)?;
+    trash::delete(p).map_err(|e| format!("Could not move the page to the Recycle Bin: {e}"))?;
+    let bak = PathBuf::from(format!("{}.bak", p.display()));
+    if bak.is_file() {
+        let _ = trash::delete(&bak);
+    }
+    Ok(())
+}
+
 #[tauri::command]
 pub fn open_in_explorer(app: tauri::AppHandle, path: String) -> Result<(), String> {
     use tauri_plugin_opener::OpenerExt;
@@ -282,6 +317,26 @@ pub fn open_in_explorer(app: tauri::AppHandle, path: String) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_page_files_in_notes_pages_can_be_binned() {
+        let dir = tempfile::tempdir().unwrap();
+        let pages = dir.path().join("Client").join("notes").join("pages");
+        fs::create_dir_all(&pages).unwrap();
+        let page = pages.join("2026-11-06-plan.page.json");
+        fs::write(&page, "{}").unwrap();
+        let other = pages.join("notes.txt");
+        fs::write(&other, "x").unwrap();
+        let loose = dir.path().join("Client").join("a.page.json");
+        fs::write(&loose, "{}").unwrap();
+
+        assert!(check_page_file(&page).is_ok());
+        assert!(check_page_file(&other).is_err());
+        assert!(check_page_file(&loose).is_err());
+        assert!(check_page_file(&pages.join("missing.page.json")).is_err());
+        assert!(check_page_file(&pages.join("..").join("pages").join("2026-11-06-plan.page.json")).is_err());
+        assert!(check_page_file(&dir.path().join("notes").join("pages")).is_err());
+    }
 
     #[test]
     fn atomic_write_keeps_one_backup() {

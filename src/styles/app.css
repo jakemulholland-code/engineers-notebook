@@ -1551,6 +1551,207 @@ button:disabled {
   border-radius: 8px;
 }
 
+.statusbar .pager button.count:hover,
+.statusbar .pager button.count[aria-expanded="true"] {
+  background: var(--chip-hover);
+  color: var(--text);
+}
+
+/* ---------- Page list ---------- */
+
+.page-list {
+  position: fixed;
+  left: 40px;
+  bottom: 52px;
+  width: min(460px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 140px));
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-popover);
+  background: var(--desk);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--shadow-popover);
+  color: var(--text);
+  font-size: 14px;
+  z-index: 40;
+}
+
+.page-list header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 10px 8px 18px;
+}
+
+.page-list h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.page-list .tab-name {
+  color: var(--text-muted);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-list header .icon-button {
+  margin-left: auto;
+}
+
+.page-list .empty {
+  margin: 4px 18px 12px;
+  color: var(--text-muted);
+}
+
+.page-list ol {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.page-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: var(--hit);
+  border-radius: var(--radius-group);
+}
+
+.page-list li:hover {
+  background: var(--chip);
+}
+
+.page-list .page-open {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--hit);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-group);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.page-list .page-open.current {
+  background: var(--mint-wash);
+}
+
+.page-list .page-open.current .num {
+  background: var(--mint);
+  color: var(--desk);
+}
+
+.page-list .num {
+  flex: 0 0 auto;
+  min-width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 13px;
+  background: var(--chip-active);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.page-list .text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-list .title {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.page-list .edited {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.page-list .row-actions {
+  display: flex;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.page-list .row-actions .icon-button {
+  color: var(--text-muted);
+}
+
+.page-list .row-actions .icon-button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.page-list .row-actions .icon-button:disabled {
+  opacity: 0.35;
+}
+
+.page-list li.editing form,
+.page-list li.confirming {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+}
+
+.page-list li.confirming {
+  flex-wrap: wrap;
+  background: var(--pink-wash);
+}
+
+.page-list li.confirming > span {
+  flex: 1 1 200px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.page-list li.confirming .actions {
+  display: flex;
+  gap: 6px;
+}
+
+.page-list li.editing input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-button);
+  border: 1px solid var(--line-strong);
+  background: var(--desk-raised);
+  color: var(--text);
+  font: inherit;
+}
+
+.page-list .small-button {
+  color: var(--text);
+}
+
+.page-list .small-button.danger {
+  border-color: var(--pink-soft);
+  color: var(--pink-soft);
+}
+
+.page-list footer {
+  display: flex;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--line);
+  margin-top: 6px;
+}
+
 .statusbar .push {
   margin-left: auto;
 }

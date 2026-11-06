@@ -869,6 +869,7 @@ export function PaperStage({ page, readOnly, notesPath, onTitleChange }: Props) 
       if (
         isTyping(e.target) ||
         useNotebook.getState().settingsOpen ||
+        useNotebook.getState().pageListOpen ||
         useExportDialog.getState().open
       )
         return;

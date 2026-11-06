@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import { currentPageOf, useNotebook, type SaveState } from "../store/notebook";
 import { useTools } from "../store/tools";
 import { ChevronLeftIcon, ChevronRightIcon, PlusIcon } from "./Icons";
+import { PageList, PAGE_LIST_TOGGLE } from "./PageList";
 import { fromYmd } from "../reminders/dates";
 import { overdueCount } from "../reminders/index";
 import { useReminderIndex, useToday } from "../reminders/useReminders";
@@ -45,6 +46,8 @@ export function StatusBar() {
   const save = useNotebook((s) => s.save);
   const goToPage = useNotebook((s) => s.goToPage);
   const newPage = useNotebook((s) => s.newPage);
+  const pageListOpen = useNotebook((s) => s.pageListOpen);
+  const setPageListOpen = useNotebook((s) => s.setPageListOpen);
   const general = useNotebook((s) => s.config.general);
   const zoom = useTools((s) => s.zoom);
   const view = useNotebook((s) => s.view);
@@ -67,9 +70,16 @@ export function StatusBar() {
           >
             <ChevronLeftIcon size={16} />
           </button>
-          <span>
+          <button
+            className="count"
+            {...{ [PAGE_LIST_TOGGLE]: "" }}
+            aria-haspopup="dialog"
+            aria-expanded={pageListOpen}
+            title="All pages (Ctrl+P)"
+            onClick={() => setPageListOpen(!pageListOpen)}
+          >
             Page {cur.index + 1} of {cur.count}
-          </span>
+          </button>
           <button
             className="icon-button small"
             aria-label="Next page"
@@ -102,6 +112,7 @@ export function StatusBar() {
         {cur ? saveLabel(save, now) : ""}
       </span>
       <span>{Math.round(zoom * 100)}%</span>
+      <PageList />
     </footer>
   );
 }

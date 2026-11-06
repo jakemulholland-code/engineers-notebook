@@ -143,6 +143,31 @@ export const FolderIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const PencilIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M13 3.5l3.5 3.5L7 16.5H3.5V13z" />
+    <path d="M11 5.5l3.5 3.5" />
+  </Svg>
+);
+export const CopyIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="7" y="7" width="10" height="10" rx="1.5" />
+    <path d="M13 4.5V4a1 1 0 00-1-1H4a1 1 0 00-1 1v8a1 1 0 001 1h.5" />
+  </Svg>
+);
+export const TrashIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3.5 5.5h13M8 5.5V4a1 1 0 011-1h2a1 1 0 011 1v1.5" />
+    <path d="M5 5.5l.8 10.6a1 1 0 001 .9h6.4a1 1 0 001-.9L15 5.5M8.5 9v5M11.5 9v5" />
+  </Svg>
+);
+export const PagesIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="5" y="2.5" width="11" height="13" rx="1.5" />
+    <path d="M3 5.5v10a2 2 0 002 2h8M8 6.5h5M8 9.5h5M8 12.5h3" />
+  </Svg>
+);
+
 export function NotebookMark() {
   return (
     <svg

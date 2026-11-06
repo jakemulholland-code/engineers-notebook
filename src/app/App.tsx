@@ -108,12 +108,20 @@ export function App() {
         useExportDialog.getState().setOpen(true);
         return;
       }
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault(); // never the browser's print dialog
+        if (s.view.kind === "tab" && !s.settingsOpen && !useExportDialog.getState().open) {
+          s.setPageListOpen(!s.pageListOpen);
+        }
+        return;
+      }
       if (
         isTyping(e.target) ||
         e.ctrlKey ||
         e.altKey ||
         e.metaKey ||
         s.settingsOpen ||
+        s.pageListOpen ||
         useExportDialog.getState().open
       )
         return;

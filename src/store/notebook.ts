@@ -15,6 +15,7 @@ import {
   undo as undoStep,
   type History,
 } from "../canvas/history";
+import { duplicate } from "../canvas/elements";
 import { backend } from "../storage/backend";
 import { loadTab, savePage, type LoadedPage } from "../storage/notebook";
 import { pagePath } from "../storage/paths";
@@ -63,6 +64,14 @@ type NotebookStore = {
   setSettingsOpen(open: boolean): void;
   dismissNotice(): void;
   newPage(): Promise<void>;
+  /** Copies a page (fresh ids, today's date) and opens the copy. */
+  duplicatePage(tabId: string, pageId: string): Promise<void>;
+  /** Moves a page's file to the Recycle Bin and opens a neighbouring page. */
+  deletePage(tabId: string, pageId: string): Promise<boolean>;
+  /** Sets a page's title; the autosave renames its file to match. */
+  renamePage(tabId: string, pageId: string, title: string): void;
+  pageListOpen: boolean;
+  setPageListOpen(open: boolean): void;
   goToPage(delta: number): void;
   updatePage(mutate: (p: Page) => Page): void;
   /** Changes any loaded page (not just the current one) and autosaves it. */
@@ -181,6 +190,23 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     }
   }
 
+  /** Adds a new page to a tab, opens it and writes its file. */
+  async function addPage(tabId: string, page: Page) {
+    const tab = get().tabs[tabId];
+    if (!tab || tab.status !== "ok") return;
+    const taken = new Set(tab.pages.map((p) => p.fileName));
+    const fileName = uniquePageFileName(page, taken);
+    setTab(tabId, { ...tab, pages: [...tab.pages, { fileName, page, readOnly: false }] });
+    set((s) => ({ currentPage: { ...s.currentPage, [tabId]: page.id } }));
+    rememberLast(tabId, page.id);
+    try {
+      await savePage(tab.notesPath, fileName, page);
+      set({ save: { kind: "saved", at: new Date() } });
+    } catch (e) {
+      set({ save: { kind: "error", message: String(e) } });
+    }
+  }
+
   return {
     ready: false,
     config: defaultConfig(),
@@ -264,7 +290,7 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     },
 
     openTab(tabId) {
-      set({ view: { kind: "tab", tabId } });
+      set({ view: { kind: "tab", tabId }, pageListOpen: false });
       const cur = currentPageOf(get());
       rememberLast(tabId, cur?.loaded.page.id);
       const ro = cur?.loaded.readOnly;
@@ -275,7 +301,7 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     },
 
     openReminders() {
-      set({ view: { kind: "reminders" } });
+      set({ view: { kind: "reminders" }, pageListOpen: false });
     },
 
     setSettingsOpen(open) {
@@ -289,20 +315,76 @@ export const useNotebook = create<NotebookStore>((set, get) => {
     async newPage() {
       const view = get().view;
       if (view.kind !== "tab") return;
-      const tab = get().tabs[view.tabId];
-      if (!tab || tab.status !== "ok") return;
-      const page = createPage();
-      const taken = new Set(tab.pages.map((p) => p.fileName));
-      const fileName = uniquePageFileName(page, taken);
-      setTab(view.tabId, { ...tab, pages: [...tab.pages, { fileName, page, readOnly: false }] });
-      set((s) => ({ currentPage: { ...s.currentPage, [view.tabId]: page.id } }));
-      rememberLast(view.tabId, page.id);
+      await addPage(view.tabId, createPage());
+    },
+
+    async duplicatePage(tabId, pageId) {
+      const tab = get().tabs[tabId];
+      if (tab?.status !== "ok") return;
+      const source = tab.pages.find((p) => p.page.id === pageId);
+      if (!source || source.readOnly) return;
+      const page: Page = {
+        ...createPage(new Date(), `${source.page.title} (copy)`),
+        elements: source.page.elements.map((el) => duplicate(el, 0, 0)),
+      };
+      await addPage(tabId, page);
+    },
+
+    async deletePage(tabId, pageId) {
+      // Finish any pending save first, so the copy in the Recycle Bin is the latest.
+      const key = `${tabId}:${pageId}`;
+      const job = pending.get(key);
+      const timer = timers.get(key);
+      if (timer) clearTimeout(timer);
+      timers.delete(key);
+      pending.delete(key);
+      if (job) await job();
+
+      const tab = get().tabs[tabId];
+      if (tab?.status !== "ok") return false;
+      const index = tab.pages.findIndex((p) => p.page.id === pageId);
+      const loaded = tab.pages[index];
+      if (!loaded || loaded.readOnly) return false;
       try {
-        await savePage(tab.notesPath, fileName, page);
-        set({ save: { kind: "saved", at: new Date() } });
+        await backend.trashPageFile(pagePath(tab.notesPath, loaded.fileName));
       } catch (e) {
-        set({ save: { kind: "error", message: String(e) } });
+        set({ notice: String(e) });
+        return false;
       }
+      histories.delete(pageId);
+      const cur = get().tabs[tabId];
+      if (cur?.status !== "ok") return true;
+      const pages = cur.pages.filter((p) => p.page.id !== pageId);
+      setTab(tabId, { ...cur, pages });
+      if (get().currentPage[tabId] === pageId || pages.length === 0) {
+        const next = pages[Math.min(index, pages.length - 1)];
+        set((s) => {
+          const currentPage = { ...s.currentPage };
+          if (next) currentPage[tabId] = next.page.id;
+          else delete currentPage[tabId];
+          return { currentPage };
+        });
+        rememberLast(tabId, next?.page.id);
+        set({
+          save: next?.readOnly
+            ? { kind: "read-only", reason: next.warning ?? "" }
+            : { kind: "saved" },
+        });
+      }
+      return true;
+    },
+
+    renamePage(tabId, pageId, title) {
+      const clean = title.trim();
+      const tab = get().tabs[tabId];
+      const loaded = tab?.status === "ok" ? tab.pages.find((p) => p.page.id === pageId) : undefined;
+      if (!clean || !loaded || loaded.page.title === clean) return;
+      get().updatePageIn(tabId, pageId, (p) => ({ ...p, title: clean }));
+    },
+
+    pageListOpen: false,
+    setPageListOpen(open) {
+      set({ pageListOpen: open });
     },
 
     goToPage(delta) {

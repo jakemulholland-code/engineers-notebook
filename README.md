@@ -85,6 +85,12 @@ npm run e2e:m4
 npm run e2e:m5
 ```
 
+`e2e:pages` covers the page list (Ctrl+P or the page count): open, rename, duplicate and delete. Deleted pages go to the Windows Recycle Bin, and the script checks they arrive there. Start the app as for `e2e:m1` but with `ENGINEERS_NOTEBOOK_APP_DIR` set to `test-fixtures\_scratch\appdata-pages`, then:
+
+```bash
+npm run e2e:pages
+```
+
 ## Export
 
 Export (toolbar button or Ctrl+Shift+E) writes Markdown, PDF or both for all tabs, one tab or the current page into a new `notebook-export-<date>` folder in the chosen destination (`-2`, `-3` and so on if one already exists, so nothing is overwritten):
